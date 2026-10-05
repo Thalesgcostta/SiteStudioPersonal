@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="370" viewBox="0 0 512 370" role="img" aria-label="KF Personal Trainer">
+<rect width="512" height="370" fill="#000"/>
+<path fill="#ff6800" d="M171 82 213 40 213 100 273 40 325 40 257 108 289 140 289 191 233 135 213 155 213 191 171 191Z"/>
+<path fill="#579aba" d="M294 82 336 40 428 40 389 79 335 79 335 98 390 98 390 138 335 138 335 191 294 191Z"/>
+<text x="20" y="301" fill="#579aba" font-family="Arial,sans-serif" font-size="25" letter-spacing="11" font-weight="600">PERSONAL TRAINER</text>
+</svg>
