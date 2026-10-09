@@ -86,10 +86,32 @@ test("pagamento parcial atualiza cobrança, caixa, dashboard e persiste após re
 test("cadastro valida dias do plano e cria perfil, agenda e cobrança", async ({
   page,
 }) => {
+  let cepRequests = 0;
+  await page.route("https://viacep.com.br/ws/01001000/json/", (route) => {
+    cepRequests++;
+    return route.fulfill({
+      json: {
+        cep: "01001-000",
+        logradouro: "Praça da Sé",
+        bairro: "Sé",
+        localidade: "São Paulo",
+        uf: "SP",
+      },
+    });
+  });
   await page
     .getByRole("button", { name: "Cadastrar aluno", exact: true })
     .click();
   const d = page.getByRole("dialog");
+  await d.getByLabel("CEP", { exact: true }).fill("01001000");
+  await d.getByRole("button", { name: "Buscar CEP", exact: true }).click();
+  await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
+    "Praça da Sé · Sé · São Paulo/SP · CEP 01001-000",
+  );
+  expect(cepRequests).toBe(1);
+  await d
+    .getByLabel("Endereço", { exact: true })
+    .fill("Praça da Sé, 42, sala 2 · Sé · São Paulo/SP · CEP 01001-000");
   await d.getByLabel("Nome completo *").fill("Alice Demonstrativa");
   await d.getByLabel("Data de nascimento *").fill("1995-05-15");
   await d.getByLabel("CPF fictício *").fill("12345678901");
@@ -113,6 +135,21 @@ test("cadastro valida dias do plano e cria perfil, agenda e cobrança", async ({
     "Alice Demonstrativa",
   );
   await expect(page.locator(".profile-main")).toContainText("R$ 280,00");
+  await expect(page.locator(".profile-card")).toContainText(
+    "Praça da Sé, 42, sala 2",
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Editar cadastro", exact: true })
+    .click();
+  await expect(d.getByLabel("CEP", { exact: true })).toHaveValue("01001-000");
+  await d.getByLabel("CEP", { exact: true }).focus();
+  await d.getByLabel("Nome completo *").focus();
+  expect(cepRequests).toBe(1);
+  await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
+    "Praça da Sé, 42, sala 2 · Sé · São Paulo/SP · CEP 01001-000",
+  );
+  await d.getByRole("button", { name: "Cancelar", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Menu principal" })
     .getByRole("button", { name: "Agenda e horários", exact: true })

@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import type { Store } from "./data";
 import type { StudioAction } from "./lib/actions";
+import type { DisplayScale } from "./lib/useDisplaySettings";
 export type ModalRequest = {
   type:
     | "student"
@@ -21,6 +22,9 @@ export type StudioContext = {
   execute: (action: StudioAction) => Promise<Store>;
   saving: boolean;
   mode: string;
+  displayScale: DisplayScale;
+  setDisplayScale: (scale: DisplayScale) => void;
+  displayStorageError: boolean;
   reload: () => Promise<void>;
   month: string;
   setMonth: (m: string) => void;

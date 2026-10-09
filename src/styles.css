@@ -122,7 +122,8 @@ b {
   top: 10px;
 }
 .app {
-  min-height: 100vh;
+  zoom: var(--ui-scale, 1);
+  min-height: calc(100vh / var(--ui-scale, 1));
 }
 .sidebar {
   width: var(--sidebar-width);
@@ -337,7 +338,7 @@ b {
 }
 .main-shell {
   margin-left: var(--sidebar-width);
-  min-height: 100vh;
+  min-height: calc(100vh / var(--ui-scale, 1));
   display: flex;
   flex-direction: column;
 }
@@ -2477,7 +2478,7 @@ td > div > small {
 .modal {
   width: 500px;
   max-width: 100%;
-  max-height: 90vh;
+  max-height: calc(90dvh / var(--ui-scale, 1));
   overflow: auto;
   background: white;
   border-radius: 13px;
@@ -2815,7 +2816,7 @@ td > div > small {
   display: flex;
   align-items: center;
   gap: 11px;
-  max-width: calc(100vw - 35px);
+  max-width: calc(100vw / var(--ui-scale, 1) - 35px);
   font-size: 11px;
   color: #83a08e;
   opacity: 0;
@@ -2875,10 +2876,7 @@ td > div > small {
     opacity: 1;
   }
 }
-@media (min-width: 1550px) {
-  :root {
-    --sidebar-width: 258px;
-  }
+:where(.app[data-wide="true"]) {
   .sidebar {
     padding-top: 38px;
   }
@@ -2957,10 +2955,7 @@ td > div > small {
     left: calc(50% + 129px);
   }
 }
-@media (max-width: 1270px) {
-  :root {
-    --sidebar-width: 216px;
-  }
+:where(.app[data-compact="true"]) {
   .sidebar {
     padding: 27px 12px 15px;
   }
@@ -3043,7 +3038,7 @@ td > div > small {
     width: 125px;
   }
 }
-@media (max-width: 1000px) {
+:where(.app[data-tablet="true"]) {
   .metrics.five {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3136,10 +3131,7 @@ td > div > small {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 760px) {
-  :root {
-    --sidebar-width: 242px;
-  }
+:where(.app[data-mobile="true"]) {
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.25s ease;
@@ -3690,7 +3682,7 @@ td > div > small {
     align-items: center;
   }
   .modal {
-    max-height: calc(100dvh - 24px);
+    max-height: calc(100dvh / var(--ui-scale, 1) - 24px);
     border-radius: 10px;
   }
   .modal-header {
@@ -3767,7 +3759,7 @@ td > div > small {
   }
   .notification-popover {
     right: -48px;
-    max-width: calc(100vw - 35px);
+    max-width: calc(100vw / var(--ui-scale, 1) - 35px);
     width: 320px;
   }
   .user-popover {
@@ -3784,7 +3776,7 @@ td > div > small {
     min-height: 40px;
   }
 }
-@media (max-width: 380px) {
+:where(.app[data-small="true"]) {
   .main-content {
     padding: 23px 13px 15px;
   }
@@ -4048,7 +4040,7 @@ td > div > small {
   color: #586a7b;
   padding: 12px 0;
 }
-@media (max-width: 1270px) {
+:where(.app[data-compact="true"]) {
   .metric-top > span:first-child {
     font-size: 9px;
   }
@@ -4062,7 +4054,7 @@ td > div > small {
     font-size: 11px;
   }
 }
-@media (max-width: 760px) {
+:where(.app[data-mobile="true"]) {
   .metric-top > span:first-child {
     font-size: 9px;
   }
@@ -4212,12 +4204,12 @@ td > div > small,
 .popover button strong {
   color: #486b84;
 }
-@media (max-width: 1000px) {
+:where(.app[data-tablet="true"]) {
   .profile-card {
     display: block;
   }
 }
-@media (max-width: 760px) {
+:where(.app[data-mobile="true"]) {
   .icon-button {
     min-width: 36px;
     min-height: 36px;
@@ -4410,8 +4402,80 @@ td > div > small,
   .auth-card input {
     font-size: 16px;
   }
+}
+:where(.app[data-mobile="true"]) {
   .saving-indicator {
     top: 75px;
     right: 15px;
+  }
+}
+
+.display-settings > select {
+  width: min(100%, 340px);
+  padding: 12px;
+  border: 1px solid #dce6ee;
+  border-radius: 7px;
+  background: #fff;
+  color: #486b84;
+  font-size: 13px;
+}
+.display-settings > .field {
+  margin-bottom: 8px;
+}
+.display-settings > .subtle-note {
+  margin-top: 15px;
+}
+.display-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  margin: 22px 0;
+  background: #f0f6fa;
+  border-radius: 9px;
+  color: #366c8b;
+}
+.display-preview strong {
+  font-size: 14px;
+}
+.display-preview p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 6px;
+}
+.cep-row {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cep-row > .field {
+  flex: 1 1 180px;
+  margin-bottom: 0;
+}
+.cep-row > .button {
+  min-height: 40px;
+}
+.address-fields .cep-help {
+  margin-bottom: 14px;
+}
+.cep-message {
+  font-size: 12px;
+  color: #366c8b;
+  line-height: 1.7;
+  margin-bottom: 14px;
+}
+.cep-spinner {
+  animation: cep-spin 1s linear infinite;
+}
+@keyframes cep-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cep-spinner {
+    animation: none;
   }
 }

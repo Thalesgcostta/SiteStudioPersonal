@@ -163,11 +163,31 @@ async function login(page: Page, email = "admin@exemplo.com") {
   await page.getByLabel("Senha", { exact: true }).fill("SenhaDeTeste123!");
   await page.getByRole("button", { name: "Entrar no studio" }).click();
 }
-async function addStudent(page: Page) {
+async function addStudent(page: Page, withCep = false) {
   await page
     .getByRole("button", { name: "Cadastrar aluno", exact: true })
     .click();
   const d = page.getByRole("dialog");
+  if (withCep) {
+    await page.route("https://viacep.com.br/ws/01001000/json/", (route) =>
+      route.fulfill({
+        json: {
+          logradouro: "Praça da Sé",
+          bairro: "Sé",
+          localidade: "São Paulo",
+          uf: "SP",
+        },
+      }),
+    );
+    await d.getByLabel("CEP", { exact: true }).fill("01001000");
+    await d.getByLabel("CEP", { exact: true }).press("Enter");
+    await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
+      "Praça da Sé · Sé · São Paulo/SP · CEP 01001-000",
+    );
+    await d
+      .getByLabel("Endereço", { exact: true })
+      .fill("Praça da Sé, 42 · Sé · São Paulo/SP · CEP 01001-000");
+  }
   await d.getByLabel("Nome completo *").fill("Alice do Banco");
   await d.getByLabel("Data de nascimento *").fill("1995-05-15");
   await d.getByLabel("CPF *", { exact: true }).fill("12345678901");
@@ -205,7 +225,11 @@ test("cadastro e pagamento persistem no PostgreSQL e após recarregar; logout li
 }) => {
   await mock(page);
   await login(page);
-  await addStudent(page);
+  await addStudent(page, true);
+  expect(
+    (await db.query<{ address: string }>("select address from public.students"))
+      .rows[0].address,
+  ).toBe("Praça da Sé, 42 · Sé · São Paulo/SP · CEP 01001-000");
   await page
     .getByRole("navigation", { name: "Menu principal" })
     .getByRole("button", { name: "Mensalidades", exact: true })
@@ -375,13 +399,11 @@ test("comprovante é enviado pela sessão e vinculado ao pagamento no banco", as
     .click();
   const d = page.getByRole("dialog");
   await d.getByLabel("Valor recebido *").fill("100");
-  await d
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "recibo.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4 test receipt"),
-    });
+  await d.locator("input[type=file]").setInputFiles({
+    name: "recibo.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 test receipt"),
+  });
   const upload = page.waitForRequest(
     (r) =>
       r.url().includes("/storage/v1/object/studio-documents/receipts/") &&

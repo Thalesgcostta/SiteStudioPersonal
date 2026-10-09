@@ -26,6 +26,7 @@ import { Context } from "./context";
 import type { ModalRequest } from "./context";
 import { billStatus, normalize, currentMonth } from "./data";
 import { useStudioData } from "./lib/useStudioData";
+import { useDisplaySettings } from "./lib/useDisplaySettings";
 import { AuthGate } from "./AuthGate";
 import { ModalHost } from "./forms";
 import {
@@ -51,6 +52,7 @@ const nav = [
 const routeNow = () => window.location.hash.slice(1) || "dashboard";
 export default function App() {
   const data = useStudioData();
+  const display = useDisplaySettings();
   const {
     store,
     execute,
@@ -86,18 +88,10 @@ export default function App() {
   const section = route.split("/")[0];
   const page = nav.find((n) => n.id === section) || nav[0];
 
-  const [narrow, setNarrow] = useState(
-    () => window.matchMedia("(max-width:760px)").matches,
-  );
+  const narrow = display.availableWidth <= 760;
   useEffect(() => {
-    const media = window.matchMedia("(max-width:760px)");
-    const change = () => {
-      setNarrow(media.matches);
-      if (!media.matches) setMobile(false);
-    };
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
+    if (!narrow) setMobile(false);
+  }, [narrow]);
   useEffect(() => {
     const fn = () => {
       setRoute(routeNow());
@@ -146,6 +140,8 @@ export default function App() {
   const style = {
     "--brand-orange": store.settings.orange,
     "--brand-blue": store.settings.blue,
+    "--ui-scale": display.activeScale,
+    "--sidebar-width": `${narrow ? 242 : display.availableWidth >= 1550 ? 258 : display.availableWidth <= 1270 ? 216 : 242}px`,
   } as CSSProperties;
   if (configError) return <AuthGate error={configError} />;
   if (mode === "supabase") {
@@ -170,6 +166,9 @@ export default function App() {
         execute,
         saving,
         mode,
+        displayScale: display.scale,
+        setDisplayScale: display.setScale,
+        displayStorageError: display.storageError,
         reload,
         month,
         setMonth,
@@ -180,7 +179,15 @@ export default function App() {
         notify,
       }}
     >
-      <div className="app" style={style}>
+      <div
+        className="app"
+        style={style}
+        data-wide={display.availableWidth >= 1550}
+        data-compact={display.availableWidth <= 1270}
+        data-tablet={display.availableWidth <= 1000}
+        data-mobile={narrow}
+        data-small={display.availableWidth <= 380}
+      >
         <a
           className="skip-link"
           href="#conteudo"

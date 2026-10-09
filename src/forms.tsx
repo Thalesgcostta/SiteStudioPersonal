@@ -2,6 +2,7 @@ import { CalendarDays, Check, CircleAlert, FileUp } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Empty, FormActions, Modal } from "./components";
+import { AddressFields } from "./AddressFields";
 import { useStudio } from "./context";
 import type { ModalRequest } from "./context";
 import {
@@ -108,11 +109,12 @@ function StudentForm({
       };
   const [form, setForm] = useState(initial);
   const [error, setError] = useState("");
+  const [addressBusy, setAddressBusy] = useState(false);
   const update = <K extends keyof Student>(key: K, value: Student[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (saving || addressBusy) return;
     if (form.name.trim().length < 3) {
       setError("Informe um nome com pelo menos três caracteres.");
       return;
@@ -217,13 +219,12 @@ function StudentForm({
                 placeholder="aluno@exemplo.com"
               />
             </label>
-            <label className="field span-2">
-              Endereço
-              <input
-                value={form.address}
-                onChange={(e) => update("address", e.target.value)}
-              />
-            </label>
+            <AddressFields
+              value={form.address}
+              onChange={(value) => update("address", value)}
+              onBusyChange={setAddressBusy}
+              disabled={saving}
+            />
             <label className="field span-2">
               Contato de emergência
               <input
@@ -374,6 +375,7 @@ function StudentForm({
         <FormActions
           onClose={onClose}
           label={existing ? "Salvar alterações" : "Cadastrar aluno"}
+          disabled={addressBusy}
         />
       </form>
     </Modal>

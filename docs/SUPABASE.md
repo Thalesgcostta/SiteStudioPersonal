@@ -132,6 +132,8 @@ Não é necessário publicar a pasta `supabase` como servidor. As migrações s�
 
 ## Operação e limites desta versão
 
+- **Exibição:** em Configurações → Tamanho da exibição, escolha 100%, 110%, 125% ou 150%. A preferência é aplicada imediatamente e salva neste navegador; não modifica as configurações de outros dispositivos e não amplia a interface em celulares.
+- **Endereço por CEP:** o cadastro e a edição consultam ViaCEP ao sair do campo com 8 dígitos, apertar Enter ou usar Buscar CEP. A consulta preenche rua, bairro, cidade e estado; acrescente número/complemento no campo Endereço. CEPs gerais podem fornecer somente cidade/estado. A consulta envia apenas o CEP ao serviço público e o resultado fica salvo no campo de endereço existente. Não é necessária uma nova migração. Falhas de consulta permitem preenchimento manual, e respostas de buscas antigas não sobrescrevem uma nova busca ou edição manual.
 - **Mensalidades:** novos alunos ativos com início até o fim do mês recebem a cobrança atual. Para os meses seguintes, selecione a competência e use **Gerar mensalidades**. O banco evita duplicatas e exclui inativos e alunos com início posterior à competência. Não há rotina mensal agendada. Alterar plano ou preço preserva cobranças emitidas.
 - **Financeiro:** usa a data efetiva do recebimento/venda. Pagamentos parciais não podem superar o saldo. Vendas validam preço e estoque no banco e gravam os itens e a baixa em uma transação. São registros administrativos; não há integração com banco, Pix ou adquirente.
 - **Comprovantes:** PNG, JPEG, WebP e PDF até 5 MB. O download usa a sessão administrativa. Se o envio funcionar e a gravação do recebimento falhar, pode restar um arquivo sem vínculo no bucket. Confira o resultado antes de reenviar e revise esses arquivos no painel quando necessário.
@@ -147,7 +149,7 @@ npm run build
 npm test
 ```
 
-Os testes executam migrações, RLS e funções em PostgreSQL local com PGlite, verificam a demonstração em Chromium e exercitam o SDK Supabase contra uma API de teste que chama essas funções SQL. Auth e Storage HTTP são simulados; os testes não criam nem alteram seu projeto remoto.
+Os testes executam migrações, RLS e funções em PostgreSQL local com PGlite, verificam a demonstração em Chromium e exercitam o SDK Supabase contra uma API de teste que chama essas funções SQL. Auth, Storage HTTP e respostas do ViaCEP são simulados; os testes não criam nem alteram seu projeto remoto. Os testes de exibição verificam ampliação, persistência, acessibilidade e adaptação das oito áreas e dos modais a diferentes larguras de tela.
 
 Instale o Chromium do Playwright com `npx playwright install chromium` se necessário, ou informe um executável via `CHROMIUM_PATH`. O ambiente de nuvem preparado já possui Chromium. Os testes usam portas 5180 e 5181 e não reutilizam o servidor conectado ao seu banco real.
 

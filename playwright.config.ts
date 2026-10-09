@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: "demo",
-      testMatch: "studio.spec.ts",
+      testMatch: ["studio.spec.ts", "preferences-address.spec.ts"],
       use: { baseURL: "http://127.0.0.1:5180" },
     },
     {

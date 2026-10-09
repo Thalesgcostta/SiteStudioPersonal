@@ -7,7 +7,7 @@ Sistema administrativo em português do Brasil, com React, TypeScript, Vite e in
 Siga o [passo a passo do Supabase](docs/SUPABASE.md) para criar o projeto, executar as migrações, autorizar a administradora e configurar o acesso local e no Cloudflare Pages. O arquivo [.env.example](.env.example) lista as variáveis públicas do frontend.
 
 - **Modo `supabase`:** login por e-mail/senha, autorização administrativa, dados persistidos no PostgreSQL, operações transacionais e comprovantes privados.
-- **Modo `demo`:** apresentação com dados fictícios no `localStorage`, sem serviço externo. É o padrão quando não há configuração de Supabase.
+- **Modo `demo`:** apresentação com dados fictícios no `localStorage`, sem exigir configuração do Supabase. É o padrão quando não há configuração de Supabase.
 
 O banco real inicia sem os exemplos do navegador. Os modos não importam dados um do outro. Configure `VITE_DATA_MODE=supabase` explicitamente na hospedagem do cliente.
 
@@ -34,13 +34,15 @@ Os testes cobrem SQL/RLS/transações em PostgreSQL local, fluxos da demonstraç
 ## Áreas do sistema
 
 1. **Dashboard:** competência mensal, indicadores, receitas, distribuição de mensalidades, agenda, cobranças em aberto e avaliações.
-2. **Alunos:** busca, filtros, perfil, cadastro, edição e ativação/inativação. Os dias escolhidos correspondem ao plano; os horários representam preferências.
+2. **Alunos:** busca, filtros, perfil, cadastro, edição e ativação/inativação. O CEP busca rua, bairro, cidade e estado pelo ViaCEP; número e complemento podem ser acrescentados no endereço. Os dias escolhidos correspondem ao plano; os horários representam preferências.
 3. **Agenda e horários:** grade semanal e consulta por dia/horário, com visão diária em celular. A capacidade indicada de quatro alunos é uma referência visual e não bloqueia cadastros.
 4. **Bioimpedância:** registro, histórico, IMC, evolução, comparação e agendamento de avaliações.
 5. **Mensalidades:** geração por competência, recebimentos totais e parciais, formas de pagamento e comprovantes. Em demo, o anexo registra apenas o nome; em Supabase, envia o arquivo para armazenamento privado.
 6. **Produtos:** cadastro e edição, catálogo, carrinho, desconto, aluno opcional, estoque e histórico de vendas.
 7. **Financeiro:** mensalidades, produtos, despesas e outras receitas, filtros, confirmação de exclusão e relatório CSV.
-8. **Configurações:** studio, logo, cores, preços dos planos, funcionamento e formas de pagamento.
+8. **Configurações:** studio, logo, cores, preços dos planos, funcionamento, formas de pagamento e tamanho da exibição (100%, 110%, 125% ou 150%). O tamanho é aplicado na hora e salvo neste navegador, mantendo a apresentação padrão em celulares.
+
+Esta atualização de exibição e CEP usa a estrutura existente do banco: não exige nova migração SQL. O endereço completo, incluindo o CEP, continua salvo na coluna `students.address`. A consulta de CEP requer acesso a `https://viacep.com.br`; se o serviço estiver indisponível ou não encontrar o CEP, o endereço pode ser preenchido manualmente.
 
 O financeiro usa regime de caixa: a data do recebimento determina a receita. Alterar um plano não altera cobranças emitidas. As mensalidades dos meses seguintes são geradas pela ação **Gerar mensalidades**; não há agendamento automático. Gravações recarregam o estado persistido, e **Atualizar dados** permite consultar alterações de outra sessão.
 
