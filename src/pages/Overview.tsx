@@ -57,12 +57,10 @@ export function Dashboard() {
     status,
     count: f.bills.filter((b) => billStatus(b) === status).length,
   }));
-  const graph = [...months]
-    .reverse()
-    .map((m) => ({
-      label: monthLabel(m, true).split(" de ")[0],
-      ...finances(store, m),
-    }));
+  const graph = [...months].reverse().map((m) => ({
+    label: monthLabel(m, true).split(" de ")[0],
+    ...finances(store, m),
+  }));
   const date = new Date(`${today}T12:00:00`).toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "numeric",
@@ -341,7 +339,7 @@ export function Dashboard() {
 }
 
 export function Students() {
-  const { store, search, month, go, open } = useStudio();
+  const { store, search, month, go, open, mode } = useStudio();
   const [view, setView] = useState("table");
   const [status, setStatus] = useState("todos");
   const [plan, setPlan] = useState("todos");
@@ -554,7 +552,8 @@ export function Students() {
           </div>
         )}
         <div className="table-footer">
-          {list.length} de {store.students.length} alunos · Dados demonstrativos
+          {list.length} de {store.students.length} alunos ·{" "}
+          {mode === "demo" ? "Dados demonstrativos" : "Cadastro do studio"}
         </div>
       </Panel>
     </>
@@ -562,7 +561,7 @@ export function Students() {
 }
 
 export function StudentProfile({ id }: { id: string }) {
-  const { store, setStore, go, open, notify } = useStudio();
+  const { store, execute, mode, go, open, notify } = useStudio();
   const s = store.students.find((s) => s.id === id);
   if (!s)
     return (
@@ -620,7 +619,7 @@ export function StudentProfile({ id }: { id: string }) {
             <dd>{s.email || "Não informado"}</dd>
             <dt>Nascimento</dt>
             <dd>{dateLabel(s.birth)}</dd>
-            <dt>CPF demonstrativo</dt>
+            <dt>{mode === "demo" ? "CPF demonstrativo" : "CPF"}</dt>
             <dd>{s.cpf}</dd>
             <dt>Endereço</dt>
             <dd>{s.address || "Não informado"}</dd>
@@ -636,13 +635,12 @@ export function StudentProfile({ id }: { id: string }) {
                 type: "confirm",
                 title: s.active ? "Inativar aluno?" : "Reativar aluno?",
                 message: `O histórico de ${s.name} será mantido. ${s.active ? "O aluno deixará de aparecer na agenda." : "O aluno voltará a aparecer na agenda."}`,
-                onConfirm: () => {
-                  setStore((prev) => ({
-                    ...prev,
-                    students: prev.students.map((a) =>
-                      a.id === id ? { ...a, active: !a.active } : a,
-                    ),
-                  }));
+                onConfirm: async () => {
+                  await execute({
+                    type: "set_student_active",
+                    id,
+                    active: !s.active,
+                  });
                   notify(
                     s.active
                       ? "Aluno inativado. Histórico preservado."
@@ -773,7 +771,9 @@ export function StudentProfile({ id }: { id: string }) {
               />
             )}
             <div className="table-footer">
-              Valores fictícios, sem interpretação clínica automática.
+              {mode === "demo"
+                ? "Valores fictícios, sem interpretação clínica automática."
+                : "Resultados apresentados sem interpretação clínica automática."}
             </div>
           </Panel>
         </div>

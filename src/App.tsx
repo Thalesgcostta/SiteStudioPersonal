@@ -18,12 +18,15 @@ import {
   Wallet,
   X,
   Activity,
+  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { Avatar, Brand, MonthSelect } from "./components";
 import { Context } from "./context";
 import type { ModalRequest } from "./context";
-import { billStatus, normalize, seed } from "./data";
-import type { Store } from "./data";
+import { billStatus, normalize, currentMonth } from "./data";
+import { useStudioData } from "./lib/useStudioData";
+import { AuthGate } from "./AuthGate";
 import { ModalHost } from "./forms";
 import {
   Dashboard,
@@ -45,42 +48,44 @@ const nav = [
   { id: "financeiro", label: "Financeiro", icon: ChartNoAxesCombined },
   { id: "configuracoes", label: "Configurações", icon: SettingsIcon },
 ];
-const storageKey = "katielle-studio-demo-v1";
-function load(): Store {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (
-        Array.isArray(parsed.students) &&
-        Array.isArray(parsed.bills) &&
-        Array.isArray(parsed.evaluations) &&
-        Array.isArray(parsed.products) &&
-        Array.isArray(parsed.sales) &&
-        Array.isArray(parsed.appointments) &&
-        Array.isArray(parsed.movements) &&
-        parsed.settings?.planPrices?.length === 5
-      )
-        return parsed;
-    }
-  } catch {
-    /* A demonstração pode continuar sem armazenamento. */
-  }
-  return seed();
-}
 const routeNow = () => window.location.hash.slice(1) || "dashboard";
 export default function App() {
-  const [store, setStore] = useState<Store>(load);
-  const [month, setMonth] = useState(() => seed().bills[0].month);
+  const data = useStudioData();
+  const {
+    store,
+    execute,
+    saving,
+    mode,
+    reload,
+    logout,
+    session,
+    loading,
+    authLoading,
+    error,
+    configError,
+    recovery,
+    setRecovery,
+    storageError,
+  } = data;
+  const [month, setMonth] = useState(currentMonth);
   const [route, setRoute] = useState(routeNow);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<ModalRequest | null>(null);
   const [toast, setToast] = useState("");
   const [mobile, setMobile] = useState(false);
   const [popover, setPopover] = useState("");
+  useEffect(() => {
+    if (mode !== "supabase") return;
+    setModal(null);
+    setToast("");
+    setSearch("");
+    setPopover("");
+    setMobile(false);
+    setMonth(currentMonth);
+  }, [session?.user.id, mode]);
   const section = route.split("/")[0];
   const page = nav.find((n) => n.id === section) || nav[0];
-  const [storageError, setStorageError] = useState(false);
+
   const [narrow, setNarrow] = useState(
     () => window.matchMedia("(max-width:760px)").matches,
   );
@@ -93,14 +98,6 @@ export default function App() {
     media.addEventListener("change", change);
     return () => media.removeEventListener("change", change);
   }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(store));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
-    }
-  }, [store]);
   useEffect(() => {
     const fn = () => {
       setRoute(routeNow());
@@ -133,7 +130,9 @@ export default function App() {
     setMobile(false);
     setPopover("");
   }, []);
-  const close = useCallback(() => setModal(null), []);
+  const close = useCallback(() => {
+    if (!saving) setModal(null);
+  }, [saving]);
   const open = useCallback((m: ModalRequest) => {
     setModal(m);
     setPopover("");
@@ -148,11 +147,30 @@ export default function App() {
     "--brand-orange": store.settings.orange,
     "--brand-blue": store.settings.blue,
   } as CSSProperties;
+  if (configError) return <AuthGate error={configError} />;
+  if (mode === "supabase") {
+    if (authLoading) return <AuthGate loading />;
+    if (recovery && session)
+      return <AuthGate recovery onRecovered={() => setRecovery(false)} />;
+    if (!session) return <AuthGate />;
+    if (loading) return <AuthGate loading />;
+    if (error)
+      return (
+        <AuthGate
+          error={error}
+          onRetry={() => void reload()}
+          onLogout={() => void logout()}
+        />
+      );
+  }
   return (
     <Context.Provider
       value={{
         store,
-        setStore,
+        execute,
+        saving,
+        mode,
+        reload,
         month,
         setMonth,
         search,
@@ -326,7 +344,11 @@ export default function App() {
                       </span>
                       <ArrowRight size={14} />
                     </button>
-                    <p>Notificações demonstrativas</p>
+                    <p>
+                      {mode === "demo"
+                        ? "Notificações demonstrativas"
+                        : "Notificações do studio"}
+                    </p>
                   </div>
                 )}
               </div>
@@ -354,13 +376,29 @@ export default function App() {
                       onClick={() => {
                         setPopover("");
                         notify(
-                          "Protótipo com dados fictícios, armazenados apenas neste navegador.",
+                          mode === "demo"
+                            ? "Protótipo com dados fictícios, armazenados apenas neste navegador."
+                            : "Dados armazenados no Supabase. Acesso restrito a administradores autorizados.",
                         );
                       }}
                     >
                       <CircleHelp size={16} />
-                      Sobre a demonstração
+                      {mode === "demo"
+                        ? "Sobre a demonstração"
+                        : "Sobre o sistema"}
                     </button>
+                    {mode === "supabase" && (
+                      <>
+                        <button disabled={saving} onClick={() => void reload()}>
+                          <RefreshCw size={16} />
+                          Atualizar dados
+                        </button>
+                        <button disabled={saving} onClick={() => void logout()}>
+                          <LogOut size={16} />
+                          Sair da conta
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -450,10 +488,17 @@ export default function App() {
             </span>
             <span>
               <span className="demo-dot" />
-              Protótipo de apresentação · dados fictícios
+              {mode === "demo"
+                ? "Demonstração · dados fictícios"
+                : "Gestão administrativa · dados no Supabase"}
             </span>
           </footer>
         </div>
+        {saving && (
+          <div className="saving-indicator" role="status">
+            Salvando no {mode === "demo" ? "navegador" : "banco"}…
+          </div>
+        )}
         {modal && <ModalHost request={modal} onClose={close} />}
         <div
           className={`toast ${toast ? "visible" : ""}`}

@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
+.env.*
+!.env.example
 *.log
 test-results/
 playwright-report/

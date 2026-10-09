@@ -20,7 +20,8 @@ import {
   uid,
 } from "../data";
 export function Products() {
-  const { store, setStore, search, notify, month } = useStudio();
+  const { store, execute, saving, mode, open, search, notify, month } =
+    useStudio();
   const [category, setCategory] = useState("Todos");
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -52,7 +53,8 @@ export function Products() {
     setCart((prev) => ({ ...prev, [id]: Math.max(0, quantity) }));
     setError("");
   };
-  const checkout = () => {
+  const checkout = async () => {
+    if (saving) return;
     if (!items.length) return;
     if (discount < 0 || discount > subtotal) {
       setError("O desconto deve estar entre zero e o subtotal.");
@@ -62,15 +64,10 @@ export function Products() {
       setError("O estoque mudou. Revise as quantidades.");
       return;
     }
-    setStore((p) => ({
-      ...p,
-      products: p.products.map((product) => ({
-        ...product,
-        stock: product.stock - (cart[product.id] || 0),
-      })),
-      sales: [
-        ...p.sales,
-        {
+    try {
+      await execute({
+        type: "record_sale",
+        sale: {
           id: uid(),
           date: today,
           studentId: student,
@@ -82,13 +79,20 @@ export function Products() {
           discount,
           method,
         },
-      ],
-    }));
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Não foi possível concluir a venda.",
+      );
+      return;
+    }
     setCart({});
     setDiscount(0);
     setStudent("");
     setError("");
-    notify(`Venda simulada concluída! Total: ${currency(total)}.`);
+    notify(
+      `${mode === "demo" ? "Venda simulada concluída" : "Venda registrada"}! Total: ${currency(total)}.`,
+    );
   };
   const sales = store.sales.filter((s) => s.date.startsWith(month));
   const ranked = store.products
@@ -107,10 +111,19 @@ export function Products() {
         title="Vendas de produtos"
         description="Produtos selecionados para acompanhar cada objetivo."
         actions={
-          <div className="sale-notice">
-            <ShoppingBag size={16} />
-            Vendas separadas das mensalidades
-          </div>
+          <>
+            <button
+              className="button primary"
+              onClick={() => open({ type: "product" })}
+            >
+              <Plus size={16} />
+              Cadastrar produto
+            </button>
+            <div className="sale-notice">
+              <ShoppingBag size={16} />
+              Vendas separadas das mensalidades
+            </div>
+          </>
         }
       />
       <div className="page-tabs">
@@ -165,6 +178,12 @@ export function Products() {
                     <span className="product-category">{p.category}</span>
                     <h3>{p.name}</h3>
                     <p>{p.variant}</p>
+                    <button
+                      className="text-button"
+                      onClick={() => open({ type: "product", productId: p.id })}
+                    >
+                      Editar produto
+                    </button>
                     <div className="product-price">
                       <strong>{currency(p.price)}</strong>
                       <span>{p.stock} em estoque</span>
@@ -183,7 +202,9 @@ export function Products() {
             </div>
             {!filtered.length && <Empty />}
             <p className="subtle-note product-caption">
-              Ilustrações demonstrativas · Produtos e preços fictícios.
+              {mode === "demo"
+                ? "Ilustrações demonstrativas · Produtos e preços fictícios."
+                : "Ilustrações dos produtos · Preços e estoque cadastrados no studio."}
             </p>
           </div>
           <Panel
@@ -304,14 +325,16 @@ export function Products() {
               )}
               <button
                 className="button primary full"
-                disabled={!items.length}
+                disabled={!items.length || saving}
                 onClick={checkout}
               >
                 <Check size={17} />
                 Finalizar venda
               </button>
               <p className="subtle-note centered">
-                Confirmação simulada · sem cobrança real
+                {mode === "demo"
+                  ? "Confirmação simulada · sem cobrança real"
+                  : "Venda de um pagamento já recebido · sem cobrança bancária"}
               </p>
             </div>
           </Panel>

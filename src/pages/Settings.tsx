@@ -10,16 +10,17 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { PageIntro, Panel } from "../components";
 import { useStudio } from "../context";
-import { currency, methods, seed } from "../data";
+import { currency, methods } from "../data";
 export function Settings() {
-  const { store, setStore, notify, open } = useStudio();
+  const { store, execute, saving, mode, notify, open } = useStudio();
   const [form, setForm] = useState({ ...store.settings });
   const [error, setError] = useState("");
   const [tab, setTab] = useState("studio");
   const update = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const save = (e: FormEvent) => {
+  const save = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (form.close <= form.open) {
       setError("O horário de fechamento deve ser após a abertura.");
       return;
@@ -32,9 +33,18 @@ export function Settings() {
       setError("Todos os planos precisam de um valor maior que zero.");
       return;
     }
-    setStore((s) => ({ ...s, settings: form }));
+    try {
+      await execute({ type: "save_settings", settings: form });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível salvar.");
+      return;
+    }
     setError("");
-    notify("Configurações salvas neste navegador.");
+    notify(
+      mode === "demo"
+        ? "Configurações salvas neste navegador."
+        : "Configurações salvas no banco.",
+    );
   };
   return (
     <>
@@ -72,7 +82,11 @@ export function Settings() {
                     ? "Planos e valores"
                     : "Horários e pagamentos"
             }
-            subtitle="As alterações são demonstrativas e ficam apenas neste navegador."
+            subtitle={
+              mode === "demo"
+                ? "As alterações são demonstrativas e ficam apenas neste navegador."
+                : "Dados e preferências do studio armazenados no banco."
+            }
           >
             {tab === "studio" ? (
               <div className="form-grid settings-fields">
@@ -258,9 +272,7 @@ export function Settings() {
                     </label>
                   ))}
                 </div>
-                <p className="subtle-note">
-                  Horários demonstrativos de segunda a sábado.
-                </p>
+                <p className="subtle-note">Horários de segunda a sábado.</p>
               </div>
             )}
             {error && (
@@ -269,42 +281,47 @@ export function Settings() {
               </p>
             )}
             <div className="settings-save">
-              <button className="button primary" type="submit">
+              <button
+                className="button primary"
+                disabled={saving}
+                type="submit"
+              >
                 <Check size={16} />
                 Salvar alterações
               </button>
             </div>
           </Panel>
-          <div className="demo-reset">
-            <div>
-              <b>Dados de demonstração</b>
-              <p>
-                Restaurar substitui todos os registros e configurações locais
-                pelos exemplos iniciais.
-              </p>
+          {mode === "demo" && (
+            <div className="demo-reset">
+              <div>
+                <b>Dados de demonstração</b>
+                <p>
+                  Restaurar substitui todos os registros e configurações locais
+                  pelos exemplos iniciais.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() =>
+                  open({
+                    type: "confirm",
+                    title: "Restaurar demonstração?",
+                    message:
+                      "Cadastros, pagamentos, avaliações e vendas feitos neste navegador serão apagados. Essa ação não pode ser desfeita.",
+                    onConfirm: async () => {
+                      const initial = await execute({ type: "reset_demo" });
+                      setForm(initial.settings);
+                      notify("Demonstração restaurada.");
+                    },
+                  })
+                }
+              >
+                <RotateCcw size={15} />
+                Restaurar exemplos
+              </button>
             </div>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() =>
-                open({
-                  type: "confirm",
-                  title: "Restaurar demonstração?",
-                  message:
-                    "Cadastros, pagamentos, avaliações e vendas feitos neste navegador serão apagados. Essa ação não pode ser desfeita.",
-                  onConfirm: () => {
-                    const initial = seed();
-                    setStore(initial);
-                    setForm(initial.settings);
-                    notify("Demonstração restaurada.");
-                  },
-                })
-              }
-            >
-              <RotateCcw size={15} />
-              Restaurar exemplos
-            </button>
-          </div>
+          )}
         </form>
       </div>
     </>

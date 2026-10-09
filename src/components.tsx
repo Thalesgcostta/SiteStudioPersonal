@@ -11,7 +11,7 @@ import {
   Minus,
   X,
 } from "lucide-react";
-import { currency, initials, monthLabel, months } from "./data";
+import { currency, initials, monthLabel, availableMonths } from "./data";
 import { useStudio } from "./context";
 
 export function Brand({ compact = false }: { compact?: boolean }) {
@@ -91,12 +91,12 @@ export function Empty({
   );
 }
 export function MonthSelect() {
-  const { month, setMonth } = useStudio();
+  const { month, setMonth, store } = useStudio();
   return (
     <label className="month-select">
       <span className="sr-only">Competência mensal</span>
       <select value={month} onChange={(e) => setMonth(e.target.value)}>
-        {months.map((m) => (
+        {availableMonths(store).map((m) => (
           <option key={m} value={m}>
             {monthLabel(m)}
           </option>
@@ -565,14 +565,24 @@ export function FormActions({
   label?: string;
   disabled?: boolean;
 }) {
+  const { saving } = useStudio();
   return (
     <footer className="form-actions">
-      <button type="button" className="button secondary" onClick={onClose}>
+      <button
+        type="button"
+        className="button secondary"
+        disabled={saving}
+        onClick={onClose}
+      >
         Cancelar
       </button>
-      <button className="button primary" disabled={disabled} type="submit">
+      <button
+        className="button primary"
+        disabled={disabled || saving}
+        type="submit"
+      >
         <Check size={16} />
-        {label}
+        {saving ? "Salvando…" : label}
       </button>
     </footer>
   );

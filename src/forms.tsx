@@ -5,17 +5,16 @@ import { Empty, FormActions, Modal } from "./components";
 import { useStudio } from "./context";
 import type { ModalRequest } from "./context";
 import {
-  currentMonth,
   currency,
   methods,
   monthLabel,
-  months,
+  availableMonths,
   paidAmount,
   today,
   uid,
   weekdays,
 } from "./data";
-import type { Student } from "./data";
+import type { Student, Product } from "./data";
 
 export function ModalHost({
   request,
@@ -24,6 +23,8 @@ export function ModalHost({
   request: ModalRequest;
   onClose: () => void;
 }) {
+  const { saving } = useStudio();
+  const [error, setError] = useState("");
   return request.type === "student" ? (
     <StudentForm studentId={request.studentId} onClose={onClose} />
   ) : request.type === "payment" ? (
@@ -34,21 +35,40 @@ export function ModalHost({
     <AppointmentForm studentId={request.studentId} onClose={onClose} />
   ) : request.type === "movement" ? (
     <MovementForm onClose={onClose} />
+  ) : request.type === "product" ? (
+    <ProductForm productId={request.productId} onClose={onClose} />
   ) : (
     <Modal title={request.title || "Confirmar ação?"} onClose={onClose}>
       <div className="confirm-body">
         <CircleAlert size={32} />
         <p>{request.message}</p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
       <div className="form-actions">
-        <button className="button secondary" onClick={onClose}>
+        <button
+          className="button secondary"
+          disabled={saving}
+          onClick={onClose}
+        >
           Cancelar
         </button>
         <button
           className="button danger-button"
-          onClick={() => {
-            request.onConfirm?.();
-            onClose();
+          disabled={saving}
+          onClick={async () => {
+            if (saving) return;
+            try {
+              await request.onConfirm?.();
+              onClose();
+            } catch (e) {
+              setError(
+                e instanceof Error ? e.message : "Não foi possível concluir.",
+              );
+            }
           }}
         >
           Confirmar
@@ -65,7 +85,7 @@ function StudentForm({
   studentId?: string;
   onClose: () => void;
 }) {
-  const { store, setStore, notify } = useStudio();
+  const { store, execute, saving, mode, notify } = useStudio();
   const existing = store.students.find((s) => s.id === studentId);
   const initial: Student = existing
     ? { ...existing, days: [...existing.days], times: { ...existing.times } }
@@ -90,14 +110,15 @@ function StudentForm({
   const [error, setError] = useState("");
   const update = <K extends keyof Student>(key: K, value: Student[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (form.name.trim().length < 3) {
       setError("Informe um nome com pelo menos três caracteres.");
       return;
     }
     if (form.cpf.replace(/\D/g, "").length !== 11) {
-      setError("Informe um CPF com 11 dígitos. Use apenas dados fictícios.");
+      setError("Informe um CPF com 11 dígitos.");
       return;
     }
     if (form.phone.replace(/\D/g, "").length < 10) {
@@ -115,26 +136,14 @@ function StudentForm({
       return;
     }
     const saved = { ...form, name: form.name.trim() };
-    setStore((s) => ({
-      ...s,
-      students: existing
-        ? s.students.map((a) => (a.id === existing.id ? saved : a))
-        : [...s.students, saved],
-      bills:
-        existing || !form.active
-          ? s.bills
-          : [
-              ...s.bills,
-              {
-                id: uid(),
-                studentId: form.id,
-                month: currentMonth,
-                amount: s.settings.planPrices[form.plan - 1],
-                due: `${currentMonth}-${String(form.due).padStart(2, "0")}`,
-                receipts: [],
-              },
-            ],
-    }));
+    try {
+      await execute({ type: "save_student", student: saved });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Não foi possível salvar o aluno.",
+      );
+      return;
+    }
     notify(
       existing
         ? "Cadastro atualizado."
@@ -179,7 +188,7 @@ function StudentForm({
               />
             </label>
             <label className="field">
-              CPF fictício *
+              {mode === "demo" ? "CPF fictício *" : "CPF *"}
               <input
                 required
                 inputMode="numeric"
@@ -357,7 +366,9 @@ function StudentForm({
             </p>
           )}
           <p className="subtle-note">
-            * Campos obrigatórios. Use somente dados fictícios neste protótipo.
+            {mode === "demo"
+              ? "* Campos obrigatórios. Use somente dados fictícios neste protótipo."
+              : "* Campos obrigatórios. Os dados serão salvos no banco do studio."}
           </p>
         </div>
         <FormActions
@@ -376,7 +387,7 @@ function PaymentForm({
   studentId?: string;
   onClose: () => void;
 }) {
-  const { store, setStore, month, notify } = useStudio();
+  const { store, execute, saving, mode, month, notify } = useStudio();
   const first = store.bills.find(
     (b) => b.month === month && paidAmount(b) < b.amount,
   );
@@ -393,10 +404,12 @@ function PaymentForm({
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
   const [attachment, setAttachment] = useState("");
+  const [file, setFile] = useState<File>();
   const [error, setError] = useState("");
   const entered = amount === "" ? balance : Number(amount);
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!bill) return;
     const value = Math.round(entered * 100) / 100;
     if (!Number.isFinite(value) || value <= 0 || value > balance + 0.001) {
@@ -413,12 +426,21 @@ function PaymentForm({
       note,
       attachment,
     };
-    setStore((s) => ({
-      ...s,
-      bills: s.bills.map((b) =>
-        b.id === bill.id ? { ...b, receipts: [...b.receipts, receipt] } : b,
-      ),
-    }));
+    try {
+      await execute({
+        type: "record_payment",
+        billId: bill.id,
+        receipt,
+        file: mode === "supabase" ? file : undefined,
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível registrar o pagamento.",
+      );
+      return;
+    }
     notify(
       `Pagamento ${value < balance ? "parcial " : ""}registrado com sucesso: ${currency(value)}.`,
     );
@@ -462,7 +484,7 @@ function PaymentForm({
                   setError("");
                 }}
               >
-                {months.map((m) => (
+                {availableMonths(store).map((m) => (
                   <option value={m} key={m}>
                     {monthLabel(m)}
                   </option>
@@ -536,11 +558,18 @@ function PaymentForm({
           <label className="receipt-upload">
             <FileUp size={23} />
             <strong>{attachment || "Selecionar comprovante"}</strong>
-            <span>Imagem ou PDF · somente o nome do arquivo é demonstrado</span>
+            <span>
+              {mode === "demo"
+                ? "Imagem ou PDF · somente o nome do arquivo é demonstrado"
+                : "Imagem ou PDF de até 5 MB · armazenamento privado"}
+            </span>
             <input
               type="file"
               accept="image/*,application/pdf"
-              onChange={(e) => setAttachment(e.target.files?.[0]?.name || "")}
+              onChange={(e) => {
+                setFile(e.target.files?.[0]);
+                setAttachment(e.target.files?.[0]?.name || "");
+              }}
             />
           </label>
           {error && (
@@ -549,7 +578,9 @@ function PaymentForm({
             </p>
           )}
           <p className="subtle-note">
-            Registro simulado. Nenhuma cobrança será realizada.
+            {mode === "demo"
+              ? "Registro simulado. Nenhuma cobrança será realizada."
+              : "Registro de um valor já recebido. O sistema não realiza cobranças bancárias."}
           </p>
         </div>
         <FormActions
@@ -569,7 +600,7 @@ function EvaluationForm({
   studentId?: string;
   onClose: () => void;
 }) {
-  const { store, setStore, notify } = useStudio();
+  const { store, execute, saving, mode, notify } = useStudio();
   const [student, setStudent] = useState(
     studentId || store.students[0]?.id || "",
   );
@@ -597,17 +628,17 @@ function EvaluationForm({
     },
     { key: "water" as const, label: "Água corporal (%)", min: 0, max: 100 },
   ];
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (Number(values.muscle) > Number(values.weight)) {
       setError("A massa muscular não pode exceder o peso informado.");
       return;
     }
-    setStore((s) => ({
-      ...s,
-      evaluations: [
-        ...s.evaluations,
-        {
+    try {
+      await execute({
+        type: "record_evaluation",
+        evaluation: {
           id: uid(),
           studentId: student,
           date,
@@ -619,18 +650,24 @@ function EvaluationForm({
           water: Number(values.water),
           notes,
         },
-      ],
-      appointments: s.appointments.filter(
-        (a) => !(a.studentId === student && a.date === date),
-      ),
-    }));
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Não foi possível salvar a avaliação.",
+      );
+      return;
+    }
     notify("Avaliação registrada com sucesso.");
     onClose();
   };
   return (
     <Modal
       title="Nova avaliação"
-      subtitle="Registre dados fictícios de bioimpedância."
+      subtitle={
+        mode === "demo"
+          ? "Registre dados fictícios de bioimpedância."
+          : "Registre os resultados de bioimpedância do aluno."
+      }
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -720,26 +757,33 @@ function AppointmentForm({
   studentId?: string;
   onClose: () => void;
 }) {
-  const { store, setStore, notify } = useStudio();
+  const { store, execute, saving, mode, notify } = useStudio();
   const [student, setStudent] = useState(
     studentId || store.students[0]?.id || "",
   );
   const [date, setDate] = useState(today);
   const [time, setTime] = useState("09:00");
   const [error, setError] = useState("");
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (store.appointments.some((a) => a.date === date && a.time === time)) {
       setError("Já há uma avaliação neste horário. Escolha outro horário.");
       return;
     }
-    setStore((s) => ({
-      ...s,
-      appointments: [
-        ...s.appointments,
-        { id: uid(), studentId: student, date, time },
-      ],
-    }));
+    try {
+      await execute({
+        type: "save_appointment",
+        appointment: { id: uid(), studentId: student, date, time },
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível agendar a avaliação.",
+      );
+      return;
+    }
     notify("Avaliação agendada com sucesso.");
     onClose();
   };
@@ -799,7 +843,11 @@ function AppointmentForm({
               {error}
             </p>
           )}
-          <p className="subtle-note">Agendamento simulado de bioimpedância.</p>
+          <p className="subtle-note">
+            {mode === "demo"
+              ? "Agendamento simulado de bioimpedância."
+              : "Agendamento de bioimpedância do studio."}
+          </p>
         </div>
         <FormActions onClose={onClose} label="Confirmar agendamento" />
       </form>
@@ -808,19 +856,20 @@ function AppointmentForm({
 }
 
 function MovementForm({ onClose }: { onClose: () => void }) {
-  const { setStore, notify } = useStudio();
+  const { execute, saving, notify } = useStudio();
+  const [error, setError] = useState("");
   const [kind, setKind] = useState<"income" | "expense">("expense");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Aluguel");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today);
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setStore((s) => ({
-      ...s,
-      movements: [
-        ...s.movements,
-        {
+    if (saving) return;
+    try {
+      await execute({
+        type: "record_movement",
+        movement: {
           id: uid(),
           description: description.trim(),
           category,
@@ -828,8 +877,15 @@ function MovementForm({ onClose }: { onClose: () => void }) {
           amount: Math.round(Number(amount) * 100) / 100,
           date,
         },
-      ],
-    }));
+      });
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível salvar a movimentação.",
+      );
+      return;
+    }
     notify(
       kind === "income"
         ? "Receita registrada com sucesso."
@@ -926,6 +982,11 @@ function MovementForm({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           </label>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <p className="subtle-note">
             Mensalidades são registradas em “Pagamentos” e vendas em “Produtos”.
           </p>
@@ -934,6 +995,135 @@ function MovementForm({ onClose }: { onClose: () => void }) {
           onClose={onClose}
           label={kind === "expense" ? "Registrar despesa" : "Registrar receita"}
         />
+      </form>
+    </Modal>
+  );
+}
+
+function ProductForm({
+  productId,
+  onClose,
+}: {
+  productId?: string;
+  onClose: () => void;
+}) {
+  const { store, execute, saving, notify } = useStudio();
+  const existing = store.products.find((p) => p.id === productId);
+  const [form, setForm] = useState<Product>(
+    existing
+      ? { ...existing }
+      : {
+          id: uid(),
+          name: "",
+          category: "Suplementos",
+          price: 1,
+          stock: 0,
+          variant: "",
+          color: "#579aba",
+        },
+  );
+  const [error, setError] = useState("");
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    try {
+      await execute({
+        type: "save_product",
+        product: { ...form, name: form.name.trim() },
+      });
+      notify(existing ? "Produto atualizado." : "Produto cadastrado.");
+      onClose();
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Não foi possível salvar o produto.",
+      );
+    }
+  };
+  return (
+    <Modal
+      title={existing ? "Editar produto" : "Cadastrar produto"}
+      subtitle="Defina o preço e o estoque disponível para venda."
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        <div className="modal-content">
+          <label className="field">
+            Nome do produto *
+            <input
+              required
+              minLength={3}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </label>
+          <label className="field">
+            Categoria
+            <select
+              value={form.category}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, category: e.target.value }))
+              }
+            >
+              {["Suplementos", "Alimentos", "Acessórios"].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <div className="form-grid">
+            <label className="field">
+              Preço (R$) *
+              <input
+                required
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.price}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, price: Number(e.target.value) }))
+                }
+              />
+            </label>
+            <label className="field">
+              Estoque disponível *
+              <input
+                required
+                type="number"
+                min="0"
+                step="1"
+                value={form.stock}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, stock: Number(e.target.value) }))
+                }
+              />
+            </label>
+          </div>
+          <label className="field">
+            Variação / descrição
+            <input
+              value={form.variant}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, variant: e.target.value }))
+              }
+              placeholder="Ex.: baunilha · 900 g"
+            />
+          </label>
+          <label className="field">
+            Cor da ilustração
+            <input
+              type="color"
+              value={form.color}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, color: e.target.value }))
+              }
+            />
+          </label>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <FormActions onClose={onClose} label="Salvar produto" />
       </form>
     </Modal>
   );

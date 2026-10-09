@@ -27,7 +27,7 @@ const metrics: {
 const value = (e: Evaluation, key: keyof Evaluation | "bmi") =>
   key === "bmi" ? e.weight / e.height ** 2 : Number(e[key]);
 export function Health() {
-  const { store, setStore, search, open, notify, go } = useStudio();
+  const { store, execute, mode, search, open, notify, go } = useStudio();
   const [student, setStudent] = useState(store.students[0]?.id || "");
   const [tab, setTab] = useState("summary");
   const [compareA, setCompareA] = useState("");
@@ -115,7 +115,9 @@ export function Health() {
         </label>
         <div className="fictitious-label">
           <Activity size={15} />
-          Valores fictícios para demonstração
+          {mode === "demo"
+            ? "Valores fictícios para demonstração"
+            : "Histórico de avaliações do studio"}
         </div>
       </div>
       {selected && (
@@ -261,14 +263,12 @@ export function Health() {
                           open({
                             type: "confirm",
                             title: "Excluir avaliação?",
-                            message: `A avaliação demonstrativa de ${dateLabel(e.date)} será removida do histórico.`,
-                            onConfirm: () => {
-                              setStore((p) => ({
-                                ...p,
-                                evaluations: p.evaluations.filter(
-                                  (a) => a.id !== e.id,
-                                ),
-                              }));
+                            message: `A avaliação de ${dateLabel(e.date)} será removida do histórico.`,
+                            onConfirm: async () => {
+                              await execute({
+                                type: "delete_evaluation",
+                                id: e.id,
+                              });
                               notify("Avaliação excluída.");
                             },
                           })
@@ -407,11 +407,8 @@ export function Health() {
                   title: "Cancelar agendamento?",
                   message:
                     "Este agendamento será removido da agenda de avaliações.",
-                  onConfirm: () => {
-                    setStore((s) => ({
-                      ...s,
-                      appointments: s.appointments.filter((a) => a.id !== p.id),
-                    }));
+                  onConfirm: async () => {
+                    await execute({ type: "delete_appointment", id: p.id });
                     notify("Agendamento cancelado.");
                   },
                 })
@@ -429,8 +426,8 @@ export function Health() {
         )}
       </Panel>
       <p className="subtle-note">
-        Dados fictícios. Os resultados devem ser interpretados por um
-        profissional habilitado.
+        {mode === "demo" ? "Dados fictícios. " : ""}Os resultados devem ser
+        interpretados por um profissional habilitado.
       </p>
     </>
   );
@@ -466,7 +463,7 @@ function EvolutionChart({
       <svg
         viewBox="0 0 570 220"
         role="img"
-        aria-label="Gráfico dos resultados fictícios das avaliações"
+        aria-label="Gráfico dos resultados das avaliações"
       >
         {[0, 0.25, 0.5, 0.75, 1].map((k) => (
           <g key={k}>

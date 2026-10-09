@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import type { Store } from "./data";
+import type { StudioAction } from "./lib/actions";
 export type ModalRequest = {
   type:
     | "student"
@@ -8,15 +8,20 @@ export type ModalRequest = {
     | "evaluation"
     | "appointment"
     | "movement"
+    | "product"
     | "confirm";
   studentId?: string;
+  productId?: string;
   title?: string;
   message?: string;
-  onConfirm?: () => void;
+  onConfirm?: () => void | Promise<void>;
 };
 export type StudioContext = {
   store: Store;
-  setStore: Dispatch<SetStateAction<Store>>;
+  execute: (action: StudioAction) => Promise<Store>;
+  saving: boolean;
+  mode: string;
+  reload: () => Promise<void>;
   month: string;
   setMonth: (m: string) => void;
   search: string;

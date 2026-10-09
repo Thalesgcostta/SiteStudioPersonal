@@ -62,6 +62,7 @@ export type Receipt = {
   method: string;
   note: string;
   attachment: string;
+  attachmentPath?: string | null;
 };
 export type Bill = {
   id: string;
@@ -97,6 +98,7 @@ export type Product = {
   stock: number;
   variant: string;
   color: string;
+  version?: number;
 };
 export type Sale = {
   id: string;
@@ -360,23 +362,21 @@ export function seed(): Store {
       amount: 90,
     },
   ]);
-  const evaluations: Evaluation[] = students
-    .slice(0, 6)
-    .flatMap((s, i) =>
-      [0, 1, 2].map((j) => ({
-        id: `e${s.id}${j}`,
-        studentId: s.id,
-        date: `${months[2 - j]}-02`,
-        weight: 67 + i * 3 - j * 0.8,
-        height: 1.65 + i * 0.02,
-        fat: 28 + i - j * 0.7,
-        muscle: 26 + i + j * 0.4,
-        visceral: 7 + i,
-        water: 51 + i + j * 0.3,
-        notes:
-          "Avaliação demonstrativa. Os resultados devem ser interpretados por profissional habilitado.",
-      })),
-    );
+  const evaluations: Evaluation[] = students.slice(0, 6).flatMap((s, i) =>
+    [0, 1, 2].map((j) => ({
+      id: `e${s.id}${j}`,
+      studentId: s.id,
+      date: `${months[2 - j]}-02`,
+      weight: 67 + i * 3 - j * 0.8,
+      height: 1.65 + i * 0.02,
+      fat: 28 + i - j * 0.7,
+      muscle: 26 + i + j * 0.4,
+      visceral: 7 + i,
+      water: 51 + i + j * 0.3,
+      notes:
+        "Avaliação demonstrativa. Os resultados devem ser interpretados por profissional habilitado.",
+    })),
+  );
   const d = new Date(`${today}T12:00:00`);
   d.setDate(d.getDate() + 2);
   const next = d.toISOString().slice(0, 10);
@@ -421,3 +421,20 @@ export const normalize = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 export const uid = () => crypto.randomUUID();
+
+export function availableMonths(store: Store) {
+  const next = new Date(`${currentMonth}-15T12:00:00`);
+  next.setMonth(next.getMonth() + 1);
+  const upcoming = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+  return [
+    ...new Set([
+      ...months,
+      upcoming,
+      ...store.bills.map((b) => b.month),
+      ...store.sales.map((s) => s.date.slice(0, 7)),
+      ...store.movements.map((m) => m.date.slice(0, 7)),
+    ]),
+  ]
+    .sort()
+    .reverse();
+}

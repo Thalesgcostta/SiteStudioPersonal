@@ -36,9 +36,11 @@ import {
   saleTotal,
 } from "../data";
 import { finances } from "../metrics";
+import { downloadReceipt } from "../lib/repository";
 
 export function Payments() {
-  const { store, month, search, open } = useStudio();
+  const { store, execute, saving, mode, month, search, open, notify } =
+    useStudio();
   const [status, setStatus] = useState("todos");
   const [student, setStudent] = useState("todos");
   const [query, setQuery] = useState("");
@@ -61,6 +63,24 @@ export function Payments() {
         actions={
           <>
             <MonthSelect />
+            <button
+              className="button secondary"
+              disabled={saving}
+              onClick={() =>
+                open({
+                  type: "confirm",
+                  title: "Gerar mensalidades?",
+                  message:
+                    "Serão criadas cobranças para os alunos ativos desta competência. As cobranças existentes serão preservadas.",
+                  onConfirm: async () => {
+                    await execute({ type: "generate_bills", month });
+                    notify("Mensalidades da competência geradas.");
+                  },
+                })
+              }
+            >
+              Gerar mensalidades
+            </button>
             <button
               className="button primary"
               onClick={() => open({ type: "payment" })}
@@ -196,7 +216,21 @@ export function Payments() {
                               <span>{dateLabel(r.date)}</span>
                               <small>
                                 {r.method} · {currency(r.amount)}
-                                {r.attachment && ` · ${r.attachment}`}
+                                {r.attachmentPath ? (
+                                  <button
+                                    className="text-button"
+                                    onClick={() =>
+                                      void downloadReceipt(
+                                        r.attachmentPath!,
+                                        r.attachment,
+                                      ).catch((e) => notify(e.message))
+                                    }
+                                  >
+                                    Baixar comprovante
+                                  </button>
+                                ) : (
+                                  r.attachment && ` · ${r.attachment}`
+                                )}
                               </small>
                             </div>
                           ))
@@ -229,8 +263,10 @@ export function Payments() {
           <Empty />
         )}
         <div className="table-footer">
-          {list.length} mensalidades · Pagamentos simulados, sem transações
-          reais.
+          {list.length} mensalidades ·{" "}
+          {mode === "demo"
+            ? "Pagamentos simulados, sem transações reais."
+            : "Recebimentos registrados no banco do studio."}
         </div>
       </Panel>
     </>
@@ -238,7 +274,7 @@ export function Payments() {
 }
 
 export function Finance() {
-  const { store, setStore, month, search, open, notify } = useStudio();
+  const { store, execute, mode, month, search, open, notify } = useStudio();
   const [category, setCategory] = useState("todas");
   const [kind, setKind] = useState("todos");
   const [start, setStart] = useState(`${month}-01`);
@@ -297,12 +333,10 @@ export function Finance() {
   const expenses = transactions
     .filter((t) => t.kind === "expense")
     .reduce((a, t) => a + t.amount, 0);
-  const graph = [...months]
-    .reverse()
-    .map((m) => ({
-      label: monthLabel(m, true).split(" de ")[0],
-      ...finances(store, m),
-    }));
+  const graph = [...months].reverse().map((m) => ({
+    label: monthLabel(m, true).split(" de ")[0],
+    ...finances(store, m),
+  }));
   const exportCSV = () => {
     const rows = [
       ["Data", "Descrição", "Categoria", "Tipo", "Valor"],
@@ -541,13 +575,11 @@ export function Finance() {
                               type: "confirm",
                               title: "Excluir movimentação?",
                               message: `${t.description}, no valor de ${currency(t.amount)}, será removida do protótipo.`,
-                              onConfirm: () => {
-                                setStore((p) => ({
-                                  ...p,
-                                  movements: p.movements.filter(
-                                    (m) => m.id !== t.id,
-                                  ),
-                                }));
+                              onConfirm: async () => {
+                                await execute({
+                                  type: "delete_movement",
+                                  id: t.id,
+                                });
                                 notify("Movimentação excluída.");
                               },
                             })
@@ -566,8 +598,10 @@ export function Finance() {
           <Empty />
         )}
         <div className="table-footer">
-          {transactions.length} movimentações · Valores fictícios para
-          demonstração.
+          {transactions.length} movimentações ·{" "}
+          {mode === "demo"
+            ? "Valores fictícios para demonstração."
+            : "Registros financeiros do studio."}
         </div>
       </Panel>
     </>
