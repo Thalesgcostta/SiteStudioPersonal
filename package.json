@@ -7,7 +7,12 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "npm run test:database && npm run test:ui && npm run test:integration",
+    "dev:site": "vite --config vite.site.config.ts --host 0.0.0.0",
+    "check:site-assets": "node site/scripts/check-media.mjs",
+    "build:site": "npm run check:site-assets && tsc -p site/tsconfig.json && vite build --config vite.site.config.ts",
+    "preview:site": "vite preview --config vite.site.config.ts --host 0.0.0.0",
+    "test": "npm run test:database && npm run test:ui && npm run test:integration && npm run test:site",
+    "test:site": "playwright test --config site/playwright.config.ts",
     "test:database": "node --test tests/database.test.mjs",
     "test:ui": "playwright test --project=demo",
     "test:integration": "playwright test --project=supabase"

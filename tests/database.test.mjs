@@ -119,6 +119,14 @@ before(async () => {
     [legacySaleId, legacyProductId],
   );
   await db.exec(inventory);
+  const publicPlansSql = await readFile(
+    new URL(
+      "../supabase/migrations/202610140005_public_plans.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  await db.exec(publicPlansSql);
   legacyProductSnapshot = (
     await db.query(
       "select p.name,p.stock,p.photo_path,p.version,p.illustration,p.deleted_at,i.price,i.quantity,s.subtotal from public.products p join public.sale_items i on i.product_id=p.id join public.sales s on s.id=i.sale_id where p.id=$1",
@@ -135,6 +143,7 @@ before(async () => {
   await db.exec(storage);
   await db.exec(management);
   await db.exec(inventory);
+  await db.exec(publicPlansSql);
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -901,4 +910,57 @@ test("migração de estoque preserva produtos, fotos e vendas de versões anteri
     quantity: 2,
     subtotal: "110.00",
   });
+});
+
+test("consulta pública expõe somente dias e preços, mantendo o administrativo privado", async () => {
+  await db.exec("reset role;set role anon");
+  const plans = (
+    await db.query("select public.get_public_studio_plans() as data")
+  ).rows[0].data;
+  assert.deepEqual(
+    plans,
+    [160, 220, 280, 360, 420].map((monthlyPrice, index) => ({
+      days: index + 1,
+      monthlyPrice,
+    })),
+  );
+  assert.ok(
+    plans.every((p) => Object.keys(p).sort().join(",") === "days,monthlyPrice"),
+  );
+  await assert.rejects(() => state(), /permission denied/);
+  await assert.rejects(
+    () => db.query("select * from public.students"),
+    /permission denied/,
+  );
+  await assert.rejects(
+    () => db.query("select * from public.plans"),
+    /permission denied/,
+  );
+  await assert.rejects(
+    () => action("save_settings", { settings: {} }),
+    /permission denied/,
+  );
+});
+
+test("preço público acompanha imediatamente os valores salvos no administrativo", async () => {
+  const store = await state();
+  const planPrices = [167, 221, 290, 373, 444];
+  await action("save_settings", {
+    settings: { ...store.settings, planPrices },
+  });
+  await db.exec("reset role;set role anon");
+  const plans = (
+    await db.query("select public.get_public_studio_plans() as data")
+  ).rows[0].data;
+  assert.deepEqual(
+    plans.map((p) => p.monthlyPrice),
+    planPrices,
+  );
+  await role(outsider);
+  assert.deepEqual(
+    (await db.query("select public.get_public_studio_plans() as data")).rows[0]
+      .data,
+    plans,
+  );
+  await assert.rejects(() => state(), /Acesso restrito/);
 });
