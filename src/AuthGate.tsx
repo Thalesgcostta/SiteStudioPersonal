@@ -79,7 +79,7 @@ export function AuthGate({
                 ? "Defina sua nova senha"
                 : reset
                   ? "Recuperar acesso"
-                  : "Bem-vinda ao seu studio"}
+                  : "Acesse seu studio"}
         </h1>
         <p>
           {loading

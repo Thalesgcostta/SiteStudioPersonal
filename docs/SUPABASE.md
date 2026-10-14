@@ -17,6 +17,9 @@ Abra **SQL Editor → New query**. Copie o conteúdo completo dos arquivos abaix
 
 1. [`supabase/migrations/202610090001_studio.sql`](../supabase/migrations/202610090001_studio.sql)
 2. [`supabase/migrations/202610090002_private_storage.sql`](../supabase/migrations/202610090002_private_storage.sql)
+3. [`supabase/migrations/202610140003_studio_management.sql`](../supabase/migrations/202610140003_studio_management.sql)
+
+Antes da migração 003, mantenha o cadastro público de Authentication desabilitado. Ela autoriza os usuários existentes e os próximos usuários criados como administradores. Para atualizar um projeto que já executou 001 e 002, siga [o guia de atualização](ATUALIZACAO_GESTAO.md) e execute somente 003.
 
 A primeira migração cria cadastros, planos, horários, mensalidades, recebimentos, avaliações, agendamentos, produtos, vendas, movimentações e configurações. Ela ativa RLS e permite alterações somente pelas funções transacionais da aplicação, depois de verificar a autorização administrativa. A segunda cria o bucket privado `studio-documents`.
 
@@ -27,7 +30,7 @@ O banco inicia **sem alunos, vendas ou cobranças fictícias**. Os cinco preços
 1. Em **Authentication → Providers/Sign In**, mantenha o login por e-mail habilitado e desabilite novos cadastros públicos (**Allow new users to sign up**). Os nomes dos menus podem variar no painel.
 2. Em **Authentication → Users → Add user → Create new user**, cadastre o e-mail da administradora com uma senha forte. Use a opção de confirmar o e-mail automaticamente para essa conta criada manualmente.
 3. Copie o **UID/UUID** do usuário criado. Não é o e-mail nem o identificador do projeto.
-4. No SQL Editor, substitua o marcador pelo UUID e execute:
+4. Com a migração 003, a conta recebe acesso administrativo automaticamente. Para instalações anteriores a 003, no SQL Editor substitua o marcador pelo UUID e execute:
 
 ```sql
 insert into public.studio_admins (user_id)
@@ -36,6 +39,8 @@ on conflict (user_id) do nothing;
 ```
 
 O login sozinho não concede acesso ao studio. Somente usuários cadastrados nessa tabela conseguem consultar ou alterar os dados; a aplicação não pode conceder essa permissão a si mesma. Para outra conta administrativa, repita a criação e a autorização. Para revogar acesso aos dados:
+
+A migração 003 cadastra automaticamente todos os usuários criados em Authentication nessa tabela. Não exponha cadastro público de contas. O modelo atual oferece o mesmo acesso administrativo a essas contas; o Dashboard e o nome de exibição são individuais.
 
 ```sql
 delete from public.studio_admins
@@ -131,6 +136,8 @@ Para **Preview**, prefira `VITE_DATA_MODE=demo` ou um projeto Supabase separado 
 Não é necessário publicar a pasta `supabase` como servidor. As migrações são aplicadas no Supabase; o Pages entrega `dist`. O domínio pode ser registrado no Registro.br e configurado no Pages.
 
 ## Operação e limites desta versão
+
+As novas opções de perfil, capacidade, preços de exames, fotos, categorias e Dashboard individual estão detalhadas no [guia da atualização de gestão](ATUALIZACAO_GESTAO.md).
 
 - **Exibição:** em Configurações → Tamanho da exibição, escolha 100%, 110%, 125% ou 150%. A preferência é aplicada imediatamente e salva neste navegador; não modifica as configurações de outros dispositivos e não amplia a interface em celulares.
 - **Endereço por CEP:** o cadastro e a edição consultam ViaCEP ao sair do campo com 8 dígitos, apertar Enter ou usar Buscar CEP. A consulta preenche rua, bairro, cidade e estado; acrescente número/complemento no campo Endereço. CEPs gerais podem fornecer somente cidade/estado. A consulta envia apenas o CEP ao serviço público e o resultado fica salvo no campo de endereço existente. Não é necessária uma nova migração. Falhas de consulta permitem preenchimento manual, e respostas de buscas antigas não sobrescrevem uma nova busca ou edição manual.

@@ -83,6 +83,15 @@ export type Evaluation = {
   visceral: number;
   water: number;
   notes: string;
+  charge: number;
+  payments: EvaluationPayment[];
+};
+export type EvaluationPayment = {
+  id: string;
+  amount: number;
+  date: string;
+  method: string;
+  note: string;
 };
 export type Appointment = {
   id: string;
@@ -99,6 +108,8 @@ export type Product = {
   variant: string;
   color: string;
   version?: number;
+  photoPath?: string | null;
+  photo?: string;
 };
 export type Sale = {
   id: string;
@@ -129,8 +140,65 @@ export type Settings = {
   orange: string;
   blue: string;
   planPrices: number[];
+  maxPerSlot: number;
+  evaluationPrice: number;
+  productCategories: string[];
+  dashboardWidgets: DashboardWidget[];
 };
+export const widgetLabels = {
+  students: "Alunos ativos",
+  fees: "Mensalidades recebidas",
+  pending: "Valores pendentes",
+  products: "Vendas de produtos",
+  bioimpedance: "Bioimpedância recebida",
+  result: "Resultado do mês",
+  financialChart: "Gráfico financeiro",
+  billStatus: "Situação das mensalidades",
+  quickActions: "Atalhos",
+  schedule: "Agenda de hoje",
+  attention: "Cobranças e próximas avaliações",
+  institutional: "Mensagem do studio",
+};
+export type DashboardWidget = {
+  id: keyof typeof widgetLabels;
+  visible: boolean;
+  size: "small" | "half" | "full";
+};
+export const defaultWidgets = (): DashboardWidget[] =>
+  Object.keys(widgetLabels).map((id, index) => ({
+    id: id as DashboardWidget["id"],
+    visible: true,
+    size:
+      index < 6
+        ? "small"
+        : ["quickActions", "institutional"].includes(id)
+          ? "full"
+          : "half",
+  }));
+export const settingsDefaults = () => ({
+  maxPerSlot: 4,
+  evaluationPrice: 0,
+  productCategories: ["Suplementos", "Alimentos", "Acessórios"],
+  dashboardWidgets: defaultWidgets(),
+});
+export const evaluationPaid = (e: Evaluation) =>
+  Math.round(e.payments.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
+export const evaluationBalance = (e: Evaluation) =>
+  Math.max(0, Math.round((e.charge - evaluationPaid(e)) * 100) / 100);
+export function upgradeStore(store: Store): Store {
+  return {
+    ...store,
+    schemaVersion: store.schemaVersion ?? 3,
+    settings: { ...settingsDefaults(), ...store.settings },
+    evaluations: store.evaluations.map((e) => ({
+      ...e,
+      charge: e.charge ?? 0,
+      payments: e.payments || [],
+    })),
+  };
+}
 export type Store = {
+  schemaVersion: number;
   students: Student[];
   bills: Bill[];
   evaluations: Evaluation[];
@@ -375,6 +443,8 @@ export function seed(): Store {
       water: 51 + i + j * 0.3,
       notes:
         "Avaliação demonstrativa. Os resultados devem ser interpretados por profissional habilitado.",
+      charge: 0,
+      payments: [],
     })),
   );
   const d = new Date(`${today}T12:00:00`);
@@ -382,6 +452,7 @@ export function seed(): Store {
   const next = d.toISOString().slice(0, 10);
   return {
     students,
+    schemaVersion: 3,
     bills,
     evaluations,
     appointments: [
@@ -393,6 +464,7 @@ export function seed(): Store {
     sales,
     movements,
     settings: {
+      ...settingsDefaults(),
       name: "Katielle Faleiros",
       professional: "Profissional de Educação Física",
       phone: "(16) 99999-0000",
@@ -433,6 +505,10 @@ export function availableMonths(store: Store) {
       ...store.bills.map((b) => b.month),
       ...store.sales.map((s) => s.date.slice(0, 7)),
       ...store.movements.map((m) => m.date.slice(0, 7)),
+      ...store.evaluations.flatMap((e) => [
+        e.date.slice(0, 7),
+        ...e.payments.map((p) => p.date.slice(0, 7)),
+      ]),
     ]),
   ]
     .sort()

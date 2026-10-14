@@ -15,7 +15,9 @@ const user = (id: string) => ({
   aud: "authenticated",
   role: "authenticated",
   app_metadata: { provider: "email" },
-  user_metadata: {},
+  user_metadata: {
+    full_name: id === admin ? "Thales Costa" : "Usuário revogado",
+  },
   created_at: new Date().toISOString(),
 });
 const token = (id: string) =>
@@ -57,8 +59,23 @@ test.beforeAll(async () => {
   await db.exec(
     await readFile("supabase/migrations/202610090001_studio.sql", "utf8"),
   );
-  await db.query("insert into public.studio_admins(user_id) values($1)", [
-    admin,
+  await db.exec(
+    `create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;grant usage on schema storage to authenticated,anon;grant select,insert on storage.objects to authenticated,anon;create function storage.foldername(text) returns text[] language sql immutable as $$select (string_to_array($1,'/'))[1:array_length(string_to_array($1,'/'),1)-1]$$;`,
+  );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/202610090002_private_storage.sql",
+      "utf8",
+    ),
+  );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/202610140003_studio_management.sql",
+      "utf8",
+    ),
+  );
+  await db.query("delete from public.studio_admins where user_id=$1", [
+    outsider,
   ]);
   today = (
     await db.query<{ today: string }>(
@@ -71,7 +88,7 @@ test.afterAll(async () => {
 });
 test.beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests cascade;set role authenticated;",
+    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences cascade;update public.studio_settings set evaluation_price=0,max_per_slot=4;set role authenticated;",
   );
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
     admin,
@@ -79,8 +96,12 @@ test.beforeEach(async () => {
 });
 async function mock(
   page: Page,
-  { failLoad = false }: { failLoad?: boolean } = {},
+  {
+    failLoad = false,
+    legacy = false,
+  }: { failLoad?: boolean; legacy?: boolean } = {},
 ) {
+  let fullName = "Thales Costa";
   await page.route(backend + "/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -106,6 +127,18 @@ async function mock(
     }
     if (url.pathname === "/auth/v1/logout") return respond({});
     if (url.pathname === "/auth/v1/recover") return respond({});
+    if (
+      url.pathname.startsWith("/storage/v1/object/sign/") &&
+      request.method() === "GET"
+    )
+      return route.fulfill({
+        status: 200,
+        headers: { "content-type": "image/png" },
+        body: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      });
     let id: string;
     try {
       id = JSON.parse(
@@ -117,7 +150,23 @@ async function mock(
     } catch {
       return respond({ message: "JWT inválido" }, 401);
     }
-    if (url.pathname === "/auth/v1/user") return respond(user(id));
+    if (url.pathname === "/auth/v1/user") {
+      if (request.method() === "PUT" && request.postDataJSON().data?.full_name)
+        fullName = request.postDataJSON().data.full_name;
+      return respond({
+        ...user(id),
+        user_metadata: {
+          full_name: id === admin ? fullName : "Usuário revogado",
+        },
+      });
+    }
+    if (url.pathname.startsWith("/storage/v1/object/sign/"))
+      return respond({
+        signedURL:
+          "/object/sign/" +
+          url.pathname.slice("/storage/v1/object/sign/".length) +
+          "?token=mock",
+      });
     if (url.pathname.startsWith("/storage/v1/object/"))
       return respond({
         Key: url.pathname.slice("/storage/v1/object/".length),
@@ -129,14 +178,28 @@ async function mock(
         id,
       ]);
       try {
-        if (url.pathname.endsWith("/get_studio_state"))
-          return respond(
-            (
-              await db.query<{ data: unknown }>(
-                "select public.get_studio_state() as data",
-              )
-            ).rows[0].data,
-          );
+        if (url.pathname.endsWith("/get_studio_state")) {
+          const data = (
+            await db.query<{ data: any }>(
+              "select public.get_studio_state() as data",
+            )
+          ).rows[0].data;
+          if (legacy) {
+            delete data.schemaVersion;
+            for (const field of [
+              "maxPerSlot",
+              "evaluationPrice",
+              "productCategories",
+              "dashboardWidgets",
+            ])
+              delete data.settings[field];
+            for (const e of data.evaluations) {
+              delete e.charge;
+              delete e.payments;
+            }
+          }
+          return respond(data);
+        }
         const body = request.postDataJSON();
         return respond(
           (
@@ -213,7 +276,7 @@ test("login exige credenciais e não importa a demonstração para o banco", asy
   await page.getByLabel("Senha", { exact: true }).fill("SenhaDeTeste123!");
   await page.getByRole("button", { name: "Entrar no studio" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Olá, Katielle 👋",
+    "Olá, Thales 👋",
   );
   await expect(page.locator(".metric").first()).toContainText("00");
   expect(
@@ -249,7 +312,7 @@ test("cadastro e pagamento persistem no PostgreSQL e após recarregar; logout li
   expect(
     await page.evaluate(() => localStorage.getItem("katielle-studio-demo-v1")),
   ).toBeNull();
-  await page.getByRole("button", { name: "Menu da administradora" }).click();
+  await page.getByRole("button", { name: "Menu do usuário" }).click();
   await page.getByRole("button", { name: "Sair da conta" }).click();
   await expect(
     page.getByRole("button", { name: "Entrar no studio" }),
@@ -380,7 +443,7 @@ test("link de recuperação pede nova senha antes de abrir o studio", async ({
   await page.getByRole("button", { name: "Salvar nova senha" }).click();
   expect((await update).postDataJSON().password).toBe("NovaSenhaDeTeste123!");
   await expect(
-    page.getByRole("heading", { name: "Olá, Katielle 👋" }),
+    page.getByRole("heading", { name: "Olá, Thales 👋" }),
   ).toBeVisible();
 });
 test("comprovante é enviado pela sessão e vinculado ao pagamento no banco", async ({
@@ -422,4 +485,302 @@ test("comprovante é enviado pela sessão e vinculado ao pagamento no banco", as
     new RegExp("^receipts/" + admin + "/"),
   );
   expect(receipt.attachment_name).toBe("recibo.pdf");
+});
+
+async function navigate(page: Page, name: string) {
+  await page
+    .getByRole("navigation", { name: "Menu principal" })
+    .getByRole("button", { name, exact: true })
+    .click();
+}
+async function configuration(page: Page, name: string) {
+  await navigate(page, "Configurações");
+  await page
+    .getByRole("navigation", { name: "Seções de configurações" })
+    .getByRole("button", { name, exact: true })
+    .click();
+}
+test("perfil acompanha a conta e nome editado persiste após recarga", async ({
+  page,
+}) => {
+  await mock(page);
+  await login(page);
+  await expect(page.locator(".sidebar-user")).toContainText("Thales Costa");
+  await configuration(page, "Meu perfil");
+  await page.getByLabel("Nome de exibição").fill("João Administrativo");
+  await page
+    .getByRole("button", { name: "Salvar perfil", exact: true })
+    .click();
+  await expect(page.locator(".sidebar-user")).toContainText(
+    "João Administrativo",
+  );
+  await page.reload();
+  await configuration(page, "Meu perfil");
+  await expect(page.getByLabel("Nome de exibição")).toHaveValue(
+    "João Administrativo",
+  );
+  await navigate(page, "Dashboard");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Olá, João 👋",
+  );
+});
+test("preço configurado, pesquisa do aluno e exame recebido atualizam financeiro e gráfico", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await mock(page);
+  await login(page);
+  await addStudent(page);
+  await configuration(page, "Horários e pagamentos");
+  await page.getByLabel("Valor da bioimpedância (R$)").fill("80");
+  await page
+    .getByRole("button", { name: "Salvar alterações", exact: true })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Configurações salvas",
+  );
+  await navigate(page, "Bioimpedância");
+  await page.getByLabel("Pesquisar aluno", { exact: true }).fill("Alice");
+  await page
+    .getByLabel("Aluno", { exact: true })
+    .selectOption({ label: "Alice do Banco" });
+  await page
+    .getByRole("button", { name: "Nova avaliação", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  for (const [label, value] of [
+    ["Peso (kg) *", "70"],
+    ["Altura (cm) *", "170"],
+    ["Gordura corporal (%) *", "25"],
+    ["Massa muscular (kg) *", "30"],
+    ["Gordura visceral (nível) *", "8"],
+    ["Água corporal (%) *", "55"],
+  ])
+    await dialog.getByLabel(label, { exact: true }).fill(value);
+  await dialog
+    .getByRole("button", { name: "Salvar avaliação", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    (
+      await db.query<{ charge: string }>(
+        "select charge from public.evaluations",
+      )
+    ).rows[0].charge,
+  ).toBe("80.00");
+  await navigate(page, "Financeiro");
+  await page
+    .getByRole("group", { name: "Origem dos valores do financeiro" })
+    .getByRole("button", { name: "Bioimpedância", exact: true })
+    .click();
+  await expect(page.locator(".metric").first()).toContainText("R$ 0,00");
+  await expect(page.locator(".metric").last()).toContainText("R$ 80,00");
+  await navigate(page, "Bioimpedância");
+  await page
+    .getByRole("button", { name: "Receber exame", exact: true })
+    .click();
+  await dialog.getByLabel("Valor recebido do exame (R$)").fill("30");
+  await dialog
+    .getByRole("button", {
+      name: "Confirmar recebimento do exame",
+      exact: true,
+    })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await navigate(page, "Financeiro");
+  await page
+    .getByRole("group", { name: "Origem dos valores do financeiro" })
+    .getByRole("button", { name: "Bioimpedância", exact: true })
+    .click();
+  await expect(page.locator(".metric").first()).toContainText("R$ 30,00");
+  await expect(page.locator(".metric").last()).toContainText("R$ 50,00");
+  await page.getByText("Ver valores do gráfico", { exact: true }).click();
+  await expect(page.locator(".chart-data")).toContainText("R$ 30,00");
+  await expect(
+    page.locator("tbody tr").filter({ hasText: "Bioimpedância · Alice" }),
+  ).toContainText("R$ 30,00");
+  await page.reload();
+  await expect(
+    page.locator("tbody tr").filter({ hasText: "Bioimpedância · Alice" }),
+  ).toContainText("R$ 30,00");
+});
+test("categoria configurada e foto privada persistem no catálogo", async ({
+  page,
+}) => {
+  await mock(page);
+  await login(page);
+  await configuration(page, "Categorias de produtos");
+  await page.getByLabel("Nome da categoria").fill("Vestuário");
+  await page
+    .getByRole("button", { name: "Adicionar categoria", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Salvar alterações", exact: true })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Configurações salvas",
+  );
+  await navigate(page, "Vendas de produtos");
+  await page
+    .getByRole("button", { name: "Cadastrar produto", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nome do produto *").fill("Camiseta KF");
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("Vestuário");
+  await dialog.getByLabel("Preço (R$) *").fill("60");
+  await dialog.getByLabel("Estoque disponível *").fill("3");
+  await dialog.getByLabel("Foto do produto").setInputFiles({
+    name: "camiseta.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await dialog
+    .getByRole("button", { name: "Salvar produto", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("img", { name: "Foto de Camiseta KF", exact: true }),
+  ).toBeVisible();
+  expect(
+    (
+      await db.query<{ photo_path: string }>(
+        "select photo_path from public.products",
+      )
+    ).rows[0].photo_path,
+  ).toMatch(new RegExp("^products/" + admin + "/"));
+  await page.reload();
+  await expect(
+    page.getByRole("img", { name: "Foto de Camiseta KF", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Editar produto", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", {
+      name: "Usar imagem padrão da categoria",
+      exact: true,
+    })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Salvar produto", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("img", { name: "Imagem padrão de Vestuário", exact: true }),
+  ).toBeVisible();
+});
+test("Dashboard oculta e move itens com persistência individual", async ({
+  page,
+}) => {
+  await mock(page);
+  await login(page);
+  await configuration(page, "Dashboard");
+  await page.getByLabel("Gráfico financeiro", { exact: true }).uncheck();
+  await page
+    .getByRole("button", { name: "Subir Bioimpedância recebida", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Salvar alterações", exact: true })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Dashboard foi atualizado",
+  );
+  await navigate(page, "Dashboard");
+  await expect(page.locator('[data-widget="financialChart"]')).toHaveCount(0);
+  const order = await page
+    .locator("[data-widget]")
+    .evaluateAll((items) => items.map((el) => el.getAttribute("data-widget")));
+  expect(order.indexOf("bioimpedance")).toBeLessThan(order.indexOf("products"));
+  await page.reload();
+  await expect(page.locator('[data-widget="financialChart"]')).toHaveCount(0);
+  expect(
+    (await db.query("select * from public.dashboard_preferences")).rows,
+  ).toHaveLength(1);
+});
+
+test("banco antigo continua acessível e novas configurações ficam bloqueadas até a migração", async ({
+  page,
+}) => {
+  await mock(page, { legacy: true });
+  await login(page);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Olá, Thales 👋",
+  );
+  await expect(page.locator(".storage-notice")).toContainText(
+    "Atualização do banco pendente",
+  );
+  await configuration(page, "Horários e pagamentos");
+  await expect(
+    page.getByRole("button", { name: "Salvar alterações", exact: true }),
+  ).toBeDisabled();
+  await navigate(page, "Mensalidades");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Mensalidades e pagamentos",
+  );
+});
+
+test("saldo de exame com centavos permite quitar o valor exato no formulário", async ({
+  page,
+}) => {
+  await mock(page);
+  const initial = (
+    await db.query<{ data: any }>("select public.get_studio_state() as data")
+  ).rows[0].data;
+  await action("save_settings", {
+    settings: { ...initial.settings, evaluationPrice: 17.3 },
+  });
+  await login(page);
+  await addStudent(page);
+  const id = (await db.query<{ id: string }>("select id from public.students"))
+    .rows[0].id;
+  await action("record_evaluation", {
+    evaluation: {
+      id: randomUUID(),
+      studentId: id,
+      date: today,
+      weight: 70,
+      height: 1.7,
+      fat: 25,
+      muscle: 30,
+      visceral: 8,
+      water: 55,
+      notes: "",
+      charge: 17.3,
+    },
+    payment: {
+      id: randomUUID(),
+      amount: 3.1,
+      date: today,
+      method: "Pix",
+      note: "",
+    },
+  });
+  await page.goto("/#bioimpedancia");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Receber exame", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Valor recebido do exame (R$)")).toHaveValue(
+    "14.2",
+  );
+  await dialog
+    .getByRole("button", {
+      name: "Confirmar recebimento do exame",
+      exact: true,
+    })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    (
+      await db.query<{ total: string }>(
+        "select sum(amount) as total from public.evaluation_payments",
+      )
+    ).rows[0].total,
+  ).toBe("17.30");
 });

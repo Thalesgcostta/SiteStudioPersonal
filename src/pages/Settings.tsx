@@ -4,6 +4,9 @@ import {
   ImagePlus,
   Palette,
   Monitor,
+  UserRound,
+  Tags,
+  LayoutDashboard,
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
@@ -14,6 +17,11 @@ import { useStudio } from "../context";
 import { currency, methods } from "../data";
 import { displaySizes } from "../lib/useDisplaySettings";
 import type { DisplayScale } from "../lib/useDisplaySettings";
+import {
+  ProductCategories,
+  DashboardSettings,
+  UserProfile,
+} from "./ManagementSettings";
 export function Settings() {
   const {
     store,
@@ -34,6 +42,36 @@ export function Settings() {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    if (tab === "dashboard") {
+      try {
+        const result = await execute({
+          type: "save_dashboard",
+          widgets: form.dashboardWidgets,
+        });
+        setForm(result.settings);
+        setError("");
+        notify("Seu Dashboard foi atualizado.");
+      } catch (e) {
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Não foi possível salvar o Dashboard.",
+        );
+      }
+      return;
+    }
+    if (
+      !Number.isInteger(form.maxPerSlot) ||
+      form.maxPerSlot < 1 ||
+      form.maxPerSlot > 50 ||
+      !Number.isFinite(form.evaluationPrice) ||
+      form.evaluationPrice < 0
+    ) {
+      setError(
+        "Informe capacidade de 1 a 50 alunos e um preço de exame válido.",
+      );
+      return;
+    }
     if (form.close <= form.open) {
       setError("O horário de fechamento deve ser após a abertura.");
       return;
@@ -74,6 +112,9 @@ export function Settings() {
             { id: "plans", title: "Planos e valores", icon: ImagePlus },
             { id: "hours", title: "Horários e pagamentos", icon: Clock3 },
             { id: "display", title: "Tamanho da exibição", icon: Monitor },
+            { id: "profile", title: "Meu perfil", icon: UserRound },
+            { id: "categories", title: "Categorias de produtos", icon: Tags },
+            { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
           ].map((t) => (
             <button
               key={t.id}
@@ -85,7 +126,9 @@ export function Settings() {
             </button>
           ))}
         </nav>
-        {tab === "display" ? (
+        {tab === "profile" ? (
+          <UserProfile />
+        ) : tab === "display" ? (
           <Panel
             title="Tamanho da exibição"
             subtitle="Deixe textos, botões e formulários mais confortáveis no computador."
@@ -142,13 +185,17 @@ export function Settings() {
           <form onSubmit={save}>
             <Panel
               title={
-                tab === "studio"
-                  ? "Dados do studio"
-                  : tab === "identity"
-                    ? "Identidade visual"
-                    : tab === "plans"
-                      ? "Planos e valores"
-                      : "Horários e pagamentos"
+                tab === "categories"
+                  ? "Categorias de produtos"
+                  : tab === "dashboard"
+                    ? "Personalizar Dashboard"
+                    : tab === "studio"
+                      ? "Dados do studio"
+                      : tab === "identity"
+                        ? "Identidade visual"
+                        : tab === "plans"
+                          ? "Planos e valores"
+                          : "Horários e pagamentos"
               }
               subtitle={
                 mode === "demo"
@@ -156,7 +203,11 @@ export function Settings() {
                   : "Dados e preferências do studio armazenados no banco."
               }
             >
-              {tab === "studio" ? (
+              {tab === "categories" ? (
+                <ProductCategories value={form} onChange={setForm} />
+              ) : tab === "dashboard" ? (
+                <DashboardSettings value={form} onChange={setForm} />
+              ) : tab === "studio" ? (
                 <div className="form-grid settings-fields">
                   <label className="field span-2">
                     Nome do studio
@@ -324,6 +375,46 @@ export function Settings() {
                   <h3 className="form-section-title">
                     Formas de pagamento aceitas
                   </h3>
+                  <div className="form-grid">
+                    <label className="field">
+                      Máximo de alunos por horário
+                      <input
+                        required
+                        type="number"
+                        min={1}
+                        max={50}
+                        step={1}
+                        value={form.maxPerSlot}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            maxPerSlot: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      Valor da bioimpedância (R$)
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={form.evaluationPrice}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            evaluationPrice: Number(e.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <p className="subtle-note">
+                    O preço vale para novos exames. Horários que já excedem a
+                    capacidade permanecem visíveis; novos encaixes respeitam o
+                    limite.
+                  </p>
                   <div className="payment-methods-settings">
                     {methods.map((m) => (
                       <label key={m}>
@@ -354,7 +445,9 @@ export function Settings() {
               <div className="settings-save">
                 <button
                   className="button primary"
-                  disabled={saving}
+                  disabled={
+                    saving || (mode === "supabase" && store.schemaVersion < 3)
+                  }
                   type="submit"
                 >
                   <Check size={16} />

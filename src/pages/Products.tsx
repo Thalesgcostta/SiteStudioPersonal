@@ -8,7 +8,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { Empty, PageIntro, Panel, ProductArt } from "../components";
+import { Empty, PageIntro, Panel } from "../components";
+import { ProductImage } from "../ProductImage";
 import { useStudio } from "../context";
 import {
   currency,
@@ -155,7 +156,7 @@ export function Products() {
               </label>
             </div>
             <div className="category-tabs">
-              {["Todos", "Suplementos", "Alimentos", "Acessórios"].map((c) => (
+              {["Todos", ...store.settings.productCategories].map((c) => (
                 <button
                   key={c}
                   className={category === c ? "active" : ""}
@@ -172,7 +173,7 @@ export function Products() {
                     {p.stock <= 3 && (
                       <span className="low-stock">Estoque baixo</span>
                     )}
-                    <ProductArt id={p.id} name={p.name} color={p.color} />
+                    <ProductImage product={p} />
                   </div>
                   <div className="product-info">
                     <span className="product-category">{p.category}</span>
@@ -223,11 +224,7 @@ export function Products() {
                 items.map((i) => (
                   <div className="cart-item" key={i.product.id}>
                     <div className="cart-thumb">
-                      <ProductArt
-                        id={i.product.id}
-                        color={i.product.color}
-                        name={i.product.name}
-                      />
+                      <ProductImage product={i.product} />
                     </div>
                     <div>
                       <strong>{i.product.name}</strong>

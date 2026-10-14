@@ -279,13 +279,17 @@ export function LineChart({
   labels?: string[];
   small?: boolean;
 }) {
-  const [a, b, c] = labels;
   const max =
     Math.max(...data.flatMap((d) => [d.fees, d.products, d.expenses]), 1) * 1.2;
+  const min =
+    Math.min(...data.flatMap((d) => [d.fees, d.products, d.expenses]), 0) * 1.2;
   const colors = ["var(--brand-blue)", "var(--brand-orange)", "#b9c1cd"];
   const point = (v: number, i: number) =>
-    `${58 + i * 104},${200 - (v / max) * 160}`;
-  const paths = ["fees", "products", "expenses"] as const;
+    `${58 + i * (528 / Math.max(1, data.length - 1))},${200 - ((v - min) / (max - min)) * 160}`;
+  const paths = (["fees", "products", "expenses"] as const).slice(
+    0,
+    labels.length,
+  );
   return (
     <div className={`chart ${small ? "small" : ""}`}>
       <div className="chart-legend">
@@ -299,7 +303,7 @@ export function LineChart({
       <svg
         viewBox="0 0 610 240"
         role="img"
-        aria-label={`Evolução mensal de ${a}, ${b} e ${c}. Valores em reais.`}
+        aria-label={`Evolução mensal de ${labels.join(", ")}. Valores em reais.`}
       >
         {[0, 0.25, 0.5, 0.75, 1].map((k) => (
           <g key={k}>
@@ -316,9 +320,9 @@ export function LineChart({
               y={204 - k * 160}
               textAnchor="end"
               fill="#929ba8"
-              fontSize="10"
+              fontSize="12"
             >
-              {currency(max * k).replace(",00", "")}
+              {currency(min + (max - min) * k).replace(",00", "")}
             </text>
           </g>
         ))}
@@ -334,8 +338,8 @@ export function LineChart({
             {data.map((d, i) => (
               <circle
                 key={i}
-                cx={58 + i * 104}
-                cy={200 - (d[key] / max) * 160}
+                cx={58 + i * (528 / Math.max(1, data.length - 1))}
+                cy={200 - ((d[key] - min) / (max - min)) * 160}
                 r="4"
                 fill={colors[j]}
                 stroke="white"
@@ -351,13 +355,18 @@ export function LineChart({
         {data.map((d, i) => (
           <text
             key={d.label}
-            x={58 + i * 104}
+            x={58 + i * (528 / Math.max(1, data.length - 1))}
             y="228"
-            textAnchor="middle"
+            textAnchor={
+              i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"
+            }
             fill="#8992a0"
-            fontSize="11"
+            fontSize="12"
           >
-            {d.label}
+            {i % Math.ceil(Math.max(1, data.length - 1) / 5) === 0 ||
+            i === data.length - 1
+              ? d.label
+              : ""}
           </text>
         ))}
       </svg>
@@ -377,9 +386,9 @@ export function LineChart({
               {data.map((d) => (
                 <tr key={d.label}>
                   <td>{d.label}</td>
-                  <td>{currency(d.fees)}</td>
-                  <td>{currency(d.products)}</td>
-                  <td>{currency(d.expenses)}</td>
+                  {paths.map((key) => (
+                    <td key={key}>{currency(d[key])}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>

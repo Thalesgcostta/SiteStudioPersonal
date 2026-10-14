@@ -43,7 +43,7 @@ import {
 import { finances } from "../metrics";
 
 export function Dashboard() {
-  const { store, month, go, open } = useStudio();
+  const { store, month, go, open, user } = useStudio();
   const f = finances(store, month);
   const find = (id: string) => store.students.find((s) => s.id === id)!;
   const day = (new Date(`${today}T12:00:00`).getDay() + 6) % 7;
@@ -67,122 +67,126 @@ export function Dashboard() {
     month: "long",
     year: "numeric",
   });
-  return (
-    <>
-      <PageIntro
-        eyebrow="SEU STUDIO, EM UM SÓ LUGAR"
-        title="Olá, Katielle 👋"
-        description="Cada detalhe em dia. Mais tempo para transformar vidas."
-        actions={
-          <>
-            <span className="today-label">
-              <CalendarDays size={15} />
-              {date}
-            </span>
-            <MonthSelect />
-          </>
-        }
+  const contents = {
+    students: (
+      <Metric
+        label="Alunos ativos"
+        value={String(store.students.filter((s) => s.active).length).padStart(
+          2,
+          "0",
+        )}
+        icon={<Users size={18} />}
+        detail="Pessoas em movimento"
       />
-      <div className="metrics five">
-        <Metric
-          label="Alunos ativos"
-          value={String(store.students.filter((s) => s.active).length).padStart(
-            2,
-            "0",
-          )}
-          icon={<Users size={18} />}
-          detail="Pessoas em movimento"
-        />
-        <Metric
-          label="Mensalidades recebidas"
-          value={currency(f.fees)}
-          icon={<CircleDollarSign size={18} />}
-          detail="Recebido no mês"
-          tone="green"
-        />
-        <Metric
-          label="Valores pendentes"
-          value={currency(f.pending)}
-          icon={<Clock3 size={18} />}
-          detail={`${f.bills.filter((b) => paidAmount(b) < b.amount).length} mensalidades em aberto`}
-          tone="orange"
-        />
-        <Metric
-          label="Vendas de produtos"
-          value={currency(f.products)}
-          icon={<ShoppingBag size={18} />}
-          detail="Recebido no mês"
-          tone="blue"
-        />
-        <Metric
-          label="Resultado do mês"
-          value={currency(f.result)}
-          icon={<TrendingUp size={18} />}
-          detail="Receitas menos despesas"
-          tone="dark"
-        />
-      </div>
-      <div className="dashboard-primary">
-        <Panel
-          title="Seu financeiro em perspectiva"
-          subtitle="Receitas e despesas dos últimos 6 meses"
-          action={
-            <button className="text-button" onClick={() => go("financeiro")}>
-              Ver financeiro <ArrowRight size={14} />
-            </button>
-          }
-        >
-          <LineChart data={graph} />
-          <div className="chart-footer">
-            <span>
-              <i className="tiny-dot" />
-              Valores efetivamente recebidos
-            </span>
-            <span>Todos os valores em reais</span>
-          </div>
-        </Panel>
-        <Panel
-          title="Mensalidades"
-          subtitle={monthLabel(month)}
-          action={<Wallet size={19} className="muted" />}
-          className="payments-overview"
-        >
-          <div
-            className="donut"
-            style={{
-              background: `conic-gradient(#579aba 0 ${(counts[0].count / f.bills.length) * 100 || 0}%, #e5ad75 ${(counts[0].count / f.bills.length) * 100 || 0}% ${((counts[0].count + counts[1].count) / f.bills.length) * 100 || 0}%, #d87768 ${((counts[0].count + counts[1].count) / f.bills.length) * 100 || 0}% ${((counts[0].count + counts[1].count + counts[2].count) / f.bills.length) * 100 || 0}%, #b1a1c6 0 100%)`,
-            }}
-          >
-            <div>
-              <strong>{f.bills.length}</strong>
-              <span>mensalidades</span>
-            </div>
-          </div>
-          <div className="donut-legend">
-            {counts.map((c, i) => (
-              <div key={c.status}>
-                <span>
-                  <i className={`legend-dot dot-${i}`} />
-                  {c.status === "Pago"
-                    ? "Pagas"
-                    : c.status === "Pendente"
-                      ? "Pendentes"
-                      : c.status === "Vencido"
-                        ? "Vencidas"
-                        : "Parciais"}
-                </span>
-                <b>{c.count}</b>
-              </div>
-            ))}
-          </div>
-          <button
-            className="button secondary full"
-            onClick={() => go("mensalidades")}
-          >
-            Gerenciar mensalidades <ArrowRight size={14} />
+    ),
+    fees: (
+      <Metric
+        label="Mensalidades recebidas"
+        value={currency(f.fees)}
+        icon={<CircleDollarSign size={18} />}
+        detail="Recebido no mês"
+        tone="green"
+      />
+    ),
+    pending: (
+      <Metric
+        label="Valores pendentes"
+        value={currency(f.pending)}
+        icon={<Clock3 size={18} />}
+        detail={`${f.bills.filter((b) => paidAmount(b) < b.amount).length} mensalidades em aberto`}
+        tone="orange"
+      />
+    ),
+    products: (
+      <Metric
+        label="Vendas de produtos"
+        value={currency(f.products)}
+        icon={<ShoppingBag size={18} />}
+        detail="Recebido no mês"
+        tone="blue"
+      />
+    ),
+    result: (
+      <Metric
+        label="Resultado do mês"
+        value={currency(f.result)}
+        icon={<TrendingUp size={18} />}
+        detail="Receitas menos despesas"
+        tone="dark"
+      />
+    ),
+    financialChart: (
+      <Panel
+        title="Seu financeiro em perspectiva"
+        subtitle="Receitas e despesas dos últimos 6 meses"
+        action={
+          <button className="text-button" onClick={() => go("financeiro")}>
+            Ver financeiro <ArrowRight size={14} />
           </button>
-        </Panel>
-      </div>
+        }
+      >
+        <LineChart
+          data={graph.map((v) => ({
+            ...v,
+            fees: v.income,
+            products: v.expenses,
+            expenses: v.result,
+          }))}
+          labels={["Receitas", "Despesas", "Resultado"]}
+        />
+        <div className="chart-footer">
+          <span>
+            <i className="tiny-dot" />
+            Valores efetivamente recebidos
+          </span>
+          <span>Todos os valores em reais</span>
+        </div>
+      </Panel>
+    ),
+    billStatus: (
+      <Panel
+        title="Mensalidades"
+        subtitle={monthLabel(month)}
+        action={<Wallet size={19} className="muted" />}
+        className="payments-overview"
+      >
+        <div
+          className="donut"
+          style={{
+            background: `conic-gradient(#579aba 0 ${(counts[0].count / f.bills.length) * 100 || 0}%, #e5ad75 ${(counts[0].count / f.bills.length) * 100 || 0}% ${((counts[0].count + counts[1].count) / f.bills.length) * 100 || 0}%, #d87768 ${((counts[0].count + counts[1].count) / f.bills.length) * 100 || 0}% ${((counts[0].count + counts[1].count + counts[2].count) / f.bills.length) * 100 || 0}%, #b1a1c6 0 100%)`,
+          }}
+        >
+          <div>
+            <strong>{f.bills.length}</strong>
+            <span>mensalidades</span>
+          </div>
+        </div>
+        <div className="donut-legend">
+          {counts.map((c, i) => (
+            <div key={c.status}>
+              <span>
+                <i className={`legend-dot dot-${i}`} />
+                {c.status === "Pago"
+                  ? "Pagas"
+                  : c.status === "Pendente"
+                    ? "Pendentes"
+                    : c.status === "Vencido"
+                      ? "Vencidas"
+                      : "Parciais"}
+              </span>
+              <b>{c.count}</b>
+            </div>
+          ))}
+        </div>
+        <button
+          className="button secondary full"
+          onClick={() => go("mensalidades")}
+        >
+          Gerenciar mensalidades <ArrowRight size={14} />
+        </button>
+      </Panel>
+    ),
+    quickActions: (
       <div className="quick-actions">
         <span>O que vamos fazer hoje?</span>
         {[
@@ -211,129 +215,187 @@ export function Dashboard() {
           </button>
         ))}
       </div>
-      <div className="dashboard-lower">
-        <Panel
-          title="Agenda de hoje"
-          subtitle={`${scheduled.length} alunos previstos · ${dateLabel(today)}`}
-          action={
-            <button className="text-button" onClick={() => go("agenda")}>
-              Ver agenda <ArrowRight size={14} />
-            </button>
-          }
-        >
-          <div className="schedule-list">
-            {scheduled.slice(0, 5).map((s) => (
-              <button
-                key={s.id}
-                className="schedule-row"
-                onClick={() => go(`alunos/${s.id}`)}
-              >
-                <span className="time">{s.times[day]}</span>
-                <Avatar name={s.name} />
-                <div>
-                  <strong>{s.name}</strong>
-                  <span>
-                    {s.plan} {s.plan === 1 ? "dia" : "dias"} por semana
-                  </span>
-                </div>
-                <span className="session-label">Treino individual</span>
-              </button>
-            ))}
-            {!scheduled.length && (
-              <Empty
-                title="Uma pausa na agenda"
-                text="Nenhum aluno previsto para hoje."
-              />
-            )}
-          </div>
-          <div className="panel-foot">
-            <span className="subtle-note">
-              <span className="live-dot" />
-              Horários de preferência dos alunos
-            </span>
-          </div>
-        </Panel>
-        <Panel
-          title="Acompanhe de perto"
-          subtitle="Pequenas ações que fazem a diferença"
-          className="attention-panel"
-        >
-          <div className="attention-label">
-            <span>
-              <Clock3 size={14} />
-              Mensalidades em aberto
-            </span>
-            <button className="text-button" onClick={() => go("mensalidades")}>
-              Ver todas <ArrowRight size={13} />
-            </button>
-          </div>
-          {upcoming.slice(0, 3).map((b) => (
+    ),
+    schedule: (
+      <Panel
+        title="Agenda de hoje"
+        subtitle={`${scheduled.length} alunos previstos · ${dateLabel(today)}`}
+        action={
+          <button className="text-button" onClick={() => go("agenda")}>
+            Ver agenda <ArrowRight size={14} />
+          </button>
+        }
+      >
+        <div className="schedule-list">
+          {scheduled.slice(0, 5).map((s) => (
             <button
-              className="due-row"
-              key={b.id}
-              onClick={() => open({ type: "payment", studentId: b.studentId })}
+              key={s.id}
+              className="schedule-row"
+              onClick={() => go(`alunos/${s.id}`)}
             >
-              <Avatar name={find(b.studentId).name} size="small" />
+              <span className="time">{s.times[day]}</span>
+              <Avatar name={s.name} />
               <div>
-                <strong>{find(b.studentId).name}</strong>
-                <span>Vencimento em {dateLabel(b.due).slice(0, 5)}</span>
+                <strong>{s.name}</strong>
+                <span>
+                  {s.plan} {s.plan === 1 ? "dia" : "dias"} por semana
+                </span>
               </div>
-              <div className="align-right">
-                <strong>{currency(b.amount - paidAmount(b))}</strong>
-                <Status value={billStatus(b)} />
-              </div>
+              <span className="session-label">Treino individual</span>
             </button>
           ))}
-          {!upcoming.length && (
-            <div className="mini-empty">Tudo em dia nesta competência.</div>
+          {!scheduled.length && (
+            <Empty
+              title="Uma pausa na agenda"
+              text="Nenhum aluno previsto para hoje."
+            />
           )}
-          <div className="attention-label evaluation-label">
-            <span>
-              <SlidersHorizontal size={14} />
-              Próximas avaliações
-            </span>
-            <button className="text-button" onClick={() => go("bioimpedancia")}>
-              Ver todas <ArrowRight size={13} />
-            </button>
-          </div>
-          {store.appointments
-            .filter((a) => a.date >= today)
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .slice(0, 2)
-            .map((a) => (
-              <div className="evaluation-row" key={a.id}>
-                <span className="date-tile">
-                  <b>{a.date.slice(8)}</b>
-                  <small>
-                    {new Date(`${a.date}T12:00:00`)
-                      .toLocaleDateString("pt-BR", { month: "short" })
-                      .replace(".", "")}
-                  </small>
-                </span>
-                <div>
-                  <strong>{find(a.studentId)?.name}</strong>
-                  <span>{a.time} · Bioimpedância</span>
-                </div>
-                <button
-                  className="icon-button"
-                  aria-label={`Registrar avaliação de ${find(a.studentId)?.name}`}
-                  onClick={() =>
-                    open({ type: "evaluation", studentId: a.studentId })
-                  }
-                >
-                  <ArrowRight size={16} />
-                </button>
+        </div>
+        <div className="panel-foot">
+          <span className="subtle-note">
+            <span className="live-dot" />
+            Horários de preferência dos alunos
+          </span>
+        </div>
+      </Panel>
+    ),
+    attention: (
+      <Panel
+        title="Acompanhe de perto"
+        subtitle="Pequenas ações que fazem a diferença"
+        className="attention-panel"
+      >
+        <div className="attention-label">
+          <span>
+            <Clock3 size={14} />
+            Mensalidades em aberto
+          </span>
+          <button className="text-button" onClick={() => go("mensalidades")}>
+            Ver todas <ArrowRight size={13} />
+          </button>
+        </div>
+        {upcoming.slice(0, 3).map((b) => (
+          <button
+            className="due-row"
+            key={b.id}
+            onClick={() => open({ type: "payment", studentId: b.studentId })}
+          >
+            <Avatar name={find(b.studentId).name} size="small" />
+            <div>
+              <strong>{find(b.studentId).name}</strong>
+              <span>Vencimento em {dateLabel(b.due).slice(0, 5)}</span>
+            </div>
+            <div className="align-right">
+              <strong>{currency(b.amount - paidAmount(b))}</strong>
+              <Status value={billStatus(b)} />
+            </div>
+          </button>
+        ))}
+        {!upcoming.length && (
+          <div className="mini-empty">Tudo em dia nesta competência.</div>
+        )}
+        <div className="attention-label evaluation-label">
+          <span>
+            <SlidersHorizontal size={14} />
+            Próximas avaliações
+          </span>
+          <button className="text-button" onClick={() => go("bioimpedancia")}>
+            Ver todas <ArrowRight size={13} />
+          </button>
+        </div>
+        {store.appointments
+          .filter((a) => a.date >= today)
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 2)
+          .map((a) => (
+            <div className="evaluation-row" key={a.id}>
+              <span className="date-tile">
+                <b>{a.date.slice(8)}</b>
+                <small>
+                  {new Date(`${a.date}T12:00:00`)
+                    .toLocaleDateString("pt-BR", { month: "short" })
+                    .replace(".", "")}
+                </small>
+              </span>
+              <div>
+                <strong>{find(a.studentId)?.name}</strong>
+                <span>{a.time} · Bioimpedância</span>
               </div>
-            ))}
-          {!store.appointments.some((a) => a.date >= today) && (
-            <div className="mini-empty">Nenhuma avaliação agendada.</div>
-          )}
-        </Panel>
-      </div>
+              <button
+                className="icon-button"
+                aria-label={`Registrar avaliação de ${find(a.studentId)?.name}`}
+                onClick={() =>
+                  open({ type: "evaluation", studentId: a.studentId })
+                }
+              >
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          ))}
+        {!store.appointments.some((a) => a.date >= today) && (
+          <div className="mini-empty">Nenhuma avaliação agendada.</div>
+        )}
+      </Panel>
+    ),
+    institutional: (
       <div className="institutional">
         <span className="brand-line" />
         Há mais de 15 anos transformando vidas através da musculação.
       </div>
+    ),
+    bioimpedance: (
+      <Metric
+        label="Bioimpedância recebida"
+        value={currency(f.bioimpedance)}
+        icon={<CircleDollarSign size={18} />}
+        detail="Recebido no mês"
+        tone="blue"
+      />
+    ),
+  };
+  return (
+    <>
+      <PageIntro
+        eyebrow="SEU STUDIO, EM UM SÓ LUGAR"
+        title={`Olá, ${user.firstName} 👋`}
+        description="Cada detalhe em dia. Mais tempo para transformar vidas."
+        actions={
+          <>
+            <span className="today-label">
+              <CalendarDays size={15} />
+              {date}
+            </span>
+            <MonthSelect />
+          </>
+        }
+      />
+      <div className="dashboard-layout">
+        {store.settings.dashboardWidgets
+          .filter((w) => w.visible)
+          .map((w) => (
+            <div
+              key={w.id}
+              className={`dashboard-widget dashboard-${w.size}`}
+              data-widget={w.id}
+            >
+              {contents[w.id]}
+            </div>
+          ))}
+      </div>
+      {!store.settings.dashboardWidgets.some((w) => w.visible) && (
+        <Empty
+          title="Seu Dashboard está vazio"
+          text="Escolha os itens em Configurações → Dashboard."
+          action={
+            <button
+              className="button primary"
+              onClick={() => go("configuracoes")}
+            >
+              Personalizar Dashboard
+            </button>
+          }
+        />
+      )}
     </>
   );
 }
@@ -821,6 +883,10 @@ export function Schedule() {
         s.times[d] === t &&
         normalize(s.name).includes(normalize(search)),
     );
+  const occupancy = (d: number, t: string) =>
+    store.students.filter(
+      (s) => s.active && s.days.includes(d) && s.times[d] === t,
+    ).length;
   const visible = times.filter((t) => time === "todos" || time === t);
   return (
     <>
@@ -943,7 +1009,17 @@ export function Schedule() {
             ))}
           </div>
           {visible.map((t) => (
-            <div className="calendar-grid calendar-grid-row" key={t}>
+            <div
+              className="calendar-grid calendar-grid-row"
+              key={t}
+              style={{
+                minHeight: Math.max(
+                  100,
+                  Math.max(...weekdays.map((_, d) => list(d, t).length)) * 66 +
+                    38,
+                ),
+              }}
+            >
               <span className="calendar-time">{t}</span>
               {weekdays.map((_, d) => (
                 <div className="calendar-cell" key={d}>
@@ -954,20 +1030,27 @@ export function Schedule() {
                       onClick={() => go(`alunos/${s.id}`)}
                     >
                       <span className="event-dot" />
-                      <strong>{s.name.split(" ").slice(0, 2).join(" ")}</strong>
+                      <strong>{s.name}</strong>
                       <small>
                         {s.plan} {s.plan === 1 ? "dia" : "dias"} / semana
                       </small>
                     </button>
                   ))}
-                  {!list(d, t).length ? (
-                    <span className="available">Disponível</span>
-                  ) : (
+                  {!list(d, t).length && (
+                    <span className="available">
+                      {occupancy(d, t) ? "Nenhum aluno da busca" : "Disponível"}
+                    </span>
+                  )}
+                  {occupancy(d, t) > 0 && (
                     <span
-                      className={`occupancy ${list(d, t).length > 4 ? "capacity-warning" : ""}`}
+                      className={`occupancy ${occupancy(d, t) > store.settings.maxPerSlot ? "capacity-warning" : ""}`}
                     >
-                      {list(d, t).length}/4 vagas
-                      {list(d, t).length > 4 ? " · lotado" : ""}
+                      {occupancy(d, t)}/{store.settings.maxPerSlot} vagas
+                      {occupancy(d, t) > store.settings.maxPerSlot
+                        ? " · excedido"
+                        : occupancy(d, t) === store.settings.maxPerSlot
+                          ? " · lotado"
+                          : ""}
                     </span>
                   )}
                 </div>
@@ -997,15 +1080,19 @@ export function Schedule() {
                     </button>
                   ))}
                 {(selected > 5 || !list(selected, t).length) && (
-                  <span className="available">Horário disponível</span>
+                  <span className="available">
+                    {occupancy(selected, t)
+                      ? "Nenhum aluno da busca"
+                      : "Horário disponível"}
+                  </span>
                 )}
               </div>
             </div>
           ))}
         </div>
         <div className="table-footer">
-          Grade recorrente de preferências · Capacidade demonstrativa: 4 alunos
-          por horário.
+          Grade recorrente · Capacidade: {store.settings.maxPerSlot} alunos por
+          horário por horário.
         </div>
       </Panel>
     </>

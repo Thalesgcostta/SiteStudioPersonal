@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { seed } from "../data";
+import { seed, upgradeStore } from "../data";
 import type { Store } from "../data";
 import { applyDemoAction, assertStore, emptyStore } from "./actions";
 import type { StudioAction } from "./actions";
@@ -13,7 +13,7 @@ function loadDemo() {
     if (raw) {
       const s: unknown = JSON.parse(raw);
       assertStore(s);
-      return s;
+      return upgradeStore(s);
     }
   } catch {
     /* Somente exemplos locais. */

@@ -30,7 +30,6 @@ import {
   currency,
   dateLabel,
   monthLabel,
-  months,
   normalize,
   paidAmount,
   saleTotal,
@@ -275,6 +274,7 @@ export function Payments() {
 
 export function Finance() {
   const { store, execute, mode, month, search, open, notify } = useStudio();
+  const [source, setSource] = useState("Tudo");
   const [category, setCategory] = useState("todas");
   const [kind, setKind] = useState("todos");
   const [start, setStart] = useState(`${month}-01`);
@@ -289,7 +289,7 @@ export function Finance() {
     setStart(`${month}-01`);
     setEnd(last(month));
   }, [month]);
-  const transactions = [
+  const allTransactions = [
     ...store.bills.flatMap((b) =>
       b.receipts.map((r) => ({
         id: r.id,
@@ -310,10 +310,23 @@ export function Finance() {
       amount: saleTotal(s),
       editable: false,
     })),
+    ...store.evaluations.flatMap((e) =>
+      e.payments.map((p) => ({
+        id: p.id,
+        date: p.date,
+        description: `Bioimpedância · ${store.students.find((s) => s.id === e.studentId)?.name || "Aluno"}`,
+        category: "Bioimpedância",
+        kind: "income" as const,
+        amount: p.amount,
+        editable: false,
+      })),
+    ),
     ...store.movements.map((m) => ({ ...m, editable: true })),
-  ]
+  ];
+  const transactions = allTransactions
     .filter(
       (t) =>
+        (source === "Tudo" || t.category === source) &&
         t.date >= start &&
         t.date <= end &&
         (category === "todas" || t.category === category) &&
@@ -333,10 +346,42 @@ export function Finance() {
   const expenses = transactions
     .filter((t) => t.kind === "expense")
     .reduce((a, t) => a + t.amount, 0);
-  const graph = [...months].reverse().map((m) => ({
-    label: monthLabel(m, true).split(" de ")[0],
-    ...finances(store, m),
-  }));
+  const bioimpedance = transactions
+    .filter((t) => t.category === "Bioimpedância")
+    .reduce((sum, t) => sum + t.amount, 0);
+  const graphMonths: string[] = [];
+  if (start && end && start <= end) {
+    let cursor = start.slice(0, 7);
+    for (let i = 0; i < 120 && cursor <= end.slice(0, 7); i++) {
+      graphMonths.push(cursor);
+      const d = new Date(`${cursor}-15T12:00:00`);
+      d.setMonth(d.getMonth() + 1);
+      cursor = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    }
+  }
+  const graph = graphMonths.slice(-36).map((m) => {
+    const rows = transactions.filter((t) => t.date.startsWith(m));
+    const income = rows
+      .filter((t) => t.kind === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expenses = rows
+      .filter((t) => t.kind === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+    return {
+      label: monthLabel(m, true),
+      fees: income,
+      products: expenses,
+      expenses: income - expenses,
+    };
+  });
+  const pending =
+    source === "Produtos"
+      ? 0
+      : source === "Bioimpedância"
+        ? finances(store, month).bioPending
+        : source === "Mensalidades"
+          ? finances(store, month).pending
+          : finances(store, month).pending + finances(store, month).bioPending;
   const exportCSV = () => {
     const rows = [
       ["Data", "Descrição", "Categoria", "Tipo", "Valor"],
@@ -386,7 +431,27 @@ export function Finance() {
           </>
         }
       />
-      <div className="metrics four">
+      <div
+        className="finance-source-filter"
+        role="group"
+        aria-label="Origem dos valores do financeiro"
+      >
+        {["Tudo", "Mensalidades", "Produtos", "Bioimpedância"].map((label) => (
+          <button
+            key={label}
+            className={`button ${source === label ? "primary" : "secondary"}`}
+            aria-pressed={source === label}
+            onClick={() => {
+              setSource(label);
+              setCategory("todas");
+              setKind("todos");
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className={`metrics ${source === "Tudo" ? "four" : "two"}`}>
         <Metric
           label="Receitas recebidas"
           value={currency(income)}
@@ -394,23 +459,27 @@ export function Finance() {
           icon={<ArrowDownLeft size={18} />}
           tone="green"
         />
-        <Metric
-          label="Despesas pagas"
-          value={currency(expenses)}
-          detail="Saídas efetivadas no período"
-          icon={<ArrowUpRight size={18} />}
-          tone="orange"
-        />
-        <Metric
-          label="Resultado do período"
-          value={currency(income - expenses)}
-          detail="Receitas menos despesas"
-          icon={<TrendingUp size={18} />}
-          tone="dark"
-        />
+        {source === "Tudo" && (
+          <>
+            <Metric
+              label="Despesas pagas"
+              value={currency(expenses)}
+              detail="Saídas efetivadas no período"
+              icon={<ArrowUpRight size={18} />}
+              tone="orange"
+            />
+            <Metric
+              label="Resultado do período"
+              value={currency(income - expenses)}
+              detail="Receitas menos despesas"
+              icon={<TrendingUp size={18} />}
+              tone="dark"
+            />
+          </>
+        )}
         <Metric
           label="Saldo a receber no mês"
-          value={currency(finances(store, month).pending)}
+          value={currency(pending)}
           detail="Previsto · não incluído nas receitas"
           icon={<Clock3 size={18} />}
         />
@@ -418,9 +487,16 @@ export function Finance() {
       <div className="finance-top">
         <Panel
           title="Evolução financeira"
-          subtitle="Valores recebidos e despesas dos últimos 6 meses"
+          subtitle="Valores do período e da origem selecionados (até 36 meses no gráfico)"
         >
-          <LineChart data={graph} />
+          <LineChart
+            data={graph}
+            labels={
+              source === "Tudo"
+                ? ["Receitas", "Despesas", "Resultado"]
+                : [source]
+            }
+          />
         </Panel>
         <Panel
           title="Origem das receitas"
@@ -454,9 +530,21 @@ export function Finance() {
               style={{ width: `${income ? (products / income) * 100 : 0}%` }}
             />
           </div>
+          <div className="revenue-source">
+            <span className="source-icon blue">
+              <Wallet size={20} />
+            </span>
+            <div>
+              <span>Bioimpedância</span>
+              <strong>{currency(bioimpedance)}</strong>
+            </div>
+            <span>
+              {income ? Math.round((bioimpedance / income) * 100) : 0}%
+            </span>
+          </div>
           <div className="other-income">
             <span>Outras receitas</span>
-            <strong>{currency(income - fees - products)}</strong>
+            <strong>{currency(income - fees - products - bioimpedance)}</strong>
           </div>
           <div className="note-box">
             <b>Regime de caixa</b>
@@ -507,6 +595,7 @@ export function Finance() {
             {[
               "Mensalidades",
               "Produtos",
+              "Bioimpedância",
               ...new Set(store.movements.map((m) => m.category)),
             ].map((c) => (
               <option key={c}>{c}</option>

@@ -9,7 +9,7 @@ import { PGlite } from "@electric-sql/pglite";
 let db;
 const admin = "11111111-1111-4111-8111-111111111111";
 const outsider = "22222222-2222-4222-8222-222222222222";
-let today, month;
+let today, month, legacySnapshot;
 const student = () => ({
   id: randomUUID(),
   name: "Aluno de teste",
@@ -73,12 +73,46 @@ before(async () => {
   );
   await db.exec(sql);
   await db.exec(storage);
+  const management = await readFile(
+    new URL(
+      "../supabase/migrations/202610140003_studio_management.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  await db.query(
+    "insert into public.students(id,name,birth,cpf,phone,start_date,plan_days,due_day) values($1,'Cadastro anterior','1990-05-15','99887766554','16999991234','2026-09-01',3,10)",
+    [admin],
+  );
+  await db.query(
+    "insert into public.bills(id,student_id,month,amount,due_date) values($1,$2,'2026-09-01',280,'2026-09-10')",
+    [outsider, admin],
+  );
+  await db.query(
+    "insert into public.receipts(id,bill_id,amount,paid_on,method,created_by) values($1,$2,100,'2026-09-10','Pix',$3)",
+    [randomUUID(), outsider, admin],
+  );
+  await db.query(
+    "insert into public.evaluations(id,student_id,evaluated_on,weight,height,fat,muscle,visceral,water,notes) values($1,$2,'2026-09-10',70,1.7,25,30,8,55,'Histórico anterior')",
+    [randomUUID(), admin],
+  );
+  await db.exec(management);
+  legacySnapshot = (
+    await db.query(
+      "select s.name,b.amount,r.amount as received,e.notes,e.charge from public.students s join public.bills b on b.student_id=s.id join public.receipts r on r.bill_id=b.id join public.evaluations e on e.student_id=s.id",
+    )
+  ).rows[0];
   // Repetir a instalação mantém dados e não duplica os planos/políticas.
   await db.exec(sql);
   await db.exec(storage);
-  await db.query("insert into public.studio_admins(user_id) values($1)", [
-    admin,
+  await db.exec(management);
+  await db.query("delete from public.studio_admins where user_id=$1", [
+    outsider,
   ]);
+  await db.query(
+    "insert into public.studio_admins(user_id) values($1) on conflict do nothing",
+    [admin],
+  );
   ({ today, month } = (
     await db.query(
       "select to_char(now() at time zone 'America/Sao_Paulo','YYYY-MM-DD') as today,to_char(now() at time zone 'America/Sao_Paulo','YYYY-MM') as month",
@@ -87,7 +121,10 @@ before(async () => {
 });
 beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests cascade;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 else 420 end;",
+    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences cascade;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 else 420 end;",
+  );
+  await db.exec(
+    "update public.studio_settings set evaluation_price=0,max_per_slot=4;",
   );
   await role();
 });
@@ -128,9 +165,10 @@ test("usuário autenticado sem concessão administrativa não acessa registros n
   );
   await assert.rejects(
     () =>
-      db.query("insert into public.studio_admins(user_id) values($1)", [
-        outsider,
-      ]),
+      db.query(
+        "insert into public.studio_admins(user_id) values($1) on conflict do nothing",
+        [outsider],
+      ),
     /permission denied/,
   );
 });
@@ -424,4 +462,265 @@ test("comprovante privado exige administrador e pasta própria; não é público
     (await db.query("select * from storage.objects")).rows.length,
     0,
   );
+});
+
+test("usuário criado no Authentication recebe papel administrativo automaticamente", async () => {
+  const id = randomUUID();
+  await db.exec("reset role");
+  await db.query("insert into auth.users(id) values($1)", [id]);
+  await role(id);
+  assert.equal((await state()).schemaVersion, 3);
+});
+test("capacidade bloqueia novos encaixes e reativação, mas preserva horários antigos", async () => {
+  const first = student();
+  let s = await action("save_student", { student: first });
+  await action("save_settings", { settings: { ...s.settings, maxPerSlot: 1 } });
+  const second = { ...student(), cpf: "98765432100" };
+  await assert.rejects(
+    () => action("save_student", { student: second }),
+    /sem vagas/,
+  );
+  assert.equal((await state()).students.length, 1);
+  await action("save_student", { student: { ...second, active: false } });
+  await assert.rejects(
+    () => action("set_student_active", { id: second.id, active: true }),
+    /sem vagas/,
+  );
+  await action("save_student", {
+    student: { ...first, name: "Nome corrigido" },
+  });
+  assert.equal((await state()).students[0].name, "Nome corrigido");
+});
+test("preço de exame gera cobrança, recebimentos parciais são atômicos e histórico não muda", async () => {
+  const { s } = await createStudent();
+  const initial = await state();
+  await action("save_settings", {
+    settings: { ...initial.settings, evaluationPrice: 80 },
+  });
+  const evaluation = {
+    id: randomUUID(),
+    studentId: s.id,
+    date: today,
+    weight: 70,
+    height: 1.7,
+    fat: 25,
+    muscle: 30,
+    visceral: 8,
+    water: 55,
+    notes: "",
+    charge: 80,
+  };
+  let result = await action("record_evaluation", { evaluation });
+  assert.equal(result.evaluations[0].charge, 80);
+  assert.deepEqual(result.evaluations[0].payments, []);
+  const payment = {
+    id: randomUUID(),
+    amount: 30,
+    date: today,
+    method: "Pix",
+    note: "Parcial",
+  };
+  const request = randomUUID();
+  await action(
+    "record_evaluation_payment",
+    { evaluationId: evaluation.id, payment },
+    request,
+  );
+  await action(
+    "record_evaluation_payment",
+    { evaluationId: evaluation.id, payment },
+    request,
+  );
+  await assert.rejects(
+    () =>
+      action("record_evaluation_payment", {
+        evaluationId: evaluation.id,
+        payment: { ...payment, id: randomUUID(), amount: 51 },
+      }),
+    /saldo do exame/,
+  );
+  await assert.rejects(
+    () => action("delete_evaluation", { id: evaluation.id }),
+    /recebimentos/,
+  );
+  result = await action("save_settings", {
+    settings: { ...result.settings, evaluationPrice: 90 },
+  });
+  assert.equal(result.evaluations[0].charge, 80);
+  assert.equal(result.evaluations[0].payments.length, 1);
+  await assert.rejects(
+    () =>
+      action("record_evaluation", {
+        evaluation: { ...evaluation, id: randomUUID() },
+      }),
+    /preço do exame mudou/,
+  );
+});
+test("exame e pagamento imediato são uma transação sem duplicação por repetição", async () => {
+  const { s } = await createStudent();
+  let store = await state();
+  await action("save_settings", {
+    settings: { ...store.settings, evaluationPrice: 50 },
+  });
+  const evaluation = {
+    id: randomUUID(),
+    studentId: s.id,
+    date: today,
+    weight: 70,
+    height: 1.7,
+    fat: 25,
+    muscle: 30,
+    visceral: 8,
+    water: 55,
+    notes: "",
+    charge: 50,
+  };
+  const payload = {
+    evaluation,
+    payment: {
+      id: randomUUID(),
+      amount: 50,
+      date: today,
+      method: "Pix",
+      note: "",
+    },
+  };
+  const id = randomUUID();
+  await action("record_evaluation", payload, id);
+  store = await action("record_evaluation", payload, id);
+  assert.equal(store.evaluations.length, 1);
+  assert.equal(store.evaluations[0].payments.length, 1);
+  await assert.rejects(
+    () =>
+      action("record_evaluation", {
+        ...payload,
+        evaluation: { ...evaluation, id: randomUUID() },
+        payment: { ...payload.payment, id: randomUUID(), amount: 51 },
+      }),
+    /saldo do exame/,
+  );
+  assert.equal((await state()).evaluations.length, 1);
+});
+test("categorias e fotos persistem e categorias em uso não podem ser removidas", async () => {
+  const original = await state();
+  await action("save_settings", {
+    settings: {
+      ...original.settings,
+      productCategories: [...original.settings.productCategories, "Vestuário"],
+    },
+  });
+  const product = {
+    id: randomUUID(),
+    name: "Camiseta do studio",
+    category: "Vestuário",
+    price: 70,
+    stock: 5,
+    variant: "M",
+    color: "#579aba",
+  };
+  let store = await action("save_product", {
+    product: {
+      ...product,
+      photoPath: `products/${admin}/${product.id}/foto.png`,
+    },
+  });
+  assert.equal(store.products[0].category, "Vestuário");
+  assert.match(store.products[0].photoPath, /foto.png$/);
+  await assert.rejects(
+    () =>
+      action("save_settings", {
+        settings: {
+          ...store.settings,
+          productCategories: original.settings.productCategories,
+        },
+      }),
+    /em uso/,
+  );
+  await assert.rejects(
+    () =>
+      action("save_product", {
+        product: {
+          ...store.products[0],
+          photoPath: `products/${outsider}/${product.id}/foto.png`,
+        },
+      }),
+    /Caminho da foto/,
+  );
+  store = await action("save_product", {
+    product: { ...store.products[0], photoPath: null },
+  });
+  assert.equal(store.products[0].photoPath, null);
+});
+test("Dashboard é individual, sem alterar preço e capacidade do studio", async () => {
+  const original = await state();
+  const widgets = original.settings.dashboardWidgets.map((w) => ({
+    ...w,
+    visible: w.id === "schedule",
+    size: w.id === "schedule" ? "full" : w.size,
+  }));
+  let store = await action("save_dashboard", { widgets });
+  assert.deepEqual(store.settings.dashboardWidgets, widgets);
+  assert.equal(store.settings.maxPerSlot, 4);
+  store = await action("save_settings", {
+    settings: { ...store.settings, evaluationPrice: 33 },
+  });
+  const id = randomUUID();
+  await db.exec("reset role");
+  await db.query("insert into auth.users(id) values($1)", [id]);
+  await role(id);
+  assert.notDeepEqual((await state()).settings.dashboardWidgets, widgets);
+  assert.equal(
+    (await db.query("select * from public.dashboard_preferences")).rows.length,
+    0,
+  );
+  await role();
+  assert.deepEqual((await state()).settings.dashboardWidgets, widgets);
+  await assert.rejects(
+    () =>
+      action("save_dashboard", {
+        widgets: widgets.map((w) => ({ id: w.id, size: w.size })),
+      }),
+    /inválida/,
+  );
+});
+
+test("bucket de fotos é privado e recusa escrita fora da pasta do administrador", async () => {
+  await db.exec("reset role");
+  const bucket = (
+    await db.query(
+      "select public,file_size_limit from storage.buckets where id='product-images'",
+    )
+  ).rows[0];
+  assert.equal(bucket.public, false);
+  assert.equal(Number(bucket.file_size_limit), 2097152);
+  await role();
+  await db.query("insert into storage.objects(bucket_id,name) values($1,$2)", [
+    "product-images",
+    `products/${admin}/${randomUUID()}/foto.png`,
+  ]);
+  await assert.rejects(
+    () =>
+      db.query("insert into storage.objects(bucket_id,name) values($1,$2)", [
+        "product-images",
+        `products/${outsider}/foto.png`,
+      ]),
+    /row-level security/,
+  );
+  await role(outsider);
+  assert.equal(
+    (
+      await db.query(
+        "select * from storage.objects where bucket_id='product-images'",
+      )
+    ).rows.length,
+    0,
+  );
+});
+
+test("migração preserva cadastros, cobrança e recebimento anteriores sem cobrar exames antigos", () => {
+  assert.equal(legacySnapshot.name, "Cadastro anterior");
+  assert.equal(Number(legacySnapshot.amount), 280);
+  assert.equal(Number(legacySnapshot.received), 100);
+  assert.equal(legacySnapshot.notes, "Histórico anterior");
+  assert.equal(Number(legacySnapshot.charge), 0);
 });

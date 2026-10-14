@@ -3,6 +3,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Empty, FormActions, Modal } from "./components";
 import { AddressFields } from "./AddressFields";
+import { StudentPicker } from "./StudentPicker";
+import { ProductImage } from "./ProductImage";
 import { useStudio } from "./context";
 import type { ModalRequest } from "./context";
 import {
@@ -13,6 +15,7 @@ import {
   paidAmount,
   today,
   uid,
+  evaluationBalance,
   weekdays,
 } from "./data";
 import type { Student, Product } from "./data";
@@ -32,6 +35,11 @@ export function ModalHost({
     <PaymentForm studentId={request.studentId} onClose={onClose} />
   ) : request.type === "evaluation" ? (
     <EvaluationForm studentId={request.studentId} onClose={onClose} />
+  ) : request.type === "evaluation_payment" ? (
+    <EvaluationPaymentForm
+      evaluationId={request.evaluationId!}
+      onClose={onClose}
+    />
   ) : request.type === "appointment" ? (
     <AppointmentForm studentId={request.studentId} onClose={onClose} />
   ) : request.type === "movement" ? (
@@ -306,7 +314,10 @@ function StudentForm({
                     days: f.days.includes(i)
                       ? f.days.filter((a) => a !== i)
                       : [...f.days, i].sort(),
-                    times: { ...f.times, [i]: f.times[i] || "07:00" },
+                    times: {
+                      ...f.times,
+                      [i]: f.times[i] || store.settings.open,
+                    },
                   }));
                   setError("");
                 }}
@@ -616,6 +627,9 @@ function EvaluationForm({
     water: "",
   });
   const [notes, setNotes] = useState("");
+  const [paidNow, setPaidNow] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(store.settings.methods[0]);
+  const [paymentDate, setPaymentDate] = useState(today);
   const [error, setError] = useState("");
   const specs = [
     { key: "weight" as const, label: "Peso (kg)", min: 1, max: 400 },
@@ -651,7 +665,19 @@ function EvaluationForm({
           visceral: Number(values.visceral),
           water: Number(values.water),
           notes,
+          charge: store.settings.evaluationPrice,
+          payments: [],
         },
+        payment:
+          paidNow && store.settings.evaluationPrice > 0
+            ? {
+                id: uid(),
+                amount: store.settings.evaluationPrice,
+                date: paymentDate,
+                method: paymentMethod,
+                note: "",
+              }
+            : undefined,
       });
     } catch (e) {
       setError(
@@ -674,21 +700,12 @@ function EvaluationForm({
     >
       <form onSubmit={submit}>
         <div className="modal-content">
-          <label className="field">
-            Aluno *
-            <select
-              aria-label="Aluno"
-              required
-              value={student}
-              onChange={(e) => setStudent(e.target.value)}
-            >
-              {store.students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <StudentPicker
+            students={store.students}
+            value={student}
+            onChange={setStudent}
+            required
+          />
           <label className="field">
             Data da avaliação *
             <input
@@ -745,6 +762,57 @@ function EvaluationForm({
           <p className="subtle-note">
             Sem classificação automática. A interpretação cabe ao profissional.
           </p>
+          <div className="exam-billing">
+            <strong>
+              Valor do exame: {currency(store.settings.evaluationPrice)}
+            </strong>
+            {store.settings.evaluationPrice > 0 ? (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={paidNow}
+                    onChange={(e) => setPaidNow(e.target.checked)}
+                  />
+                  Registrar pagamento agora
+                </label>
+                {paidNow && (
+                  <div className="form-grid">
+                    <label className="field">
+                      Data do pagamento do exame
+                      <input
+                        type="date"
+                        required
+                        max={today}
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      Forma de pagamento do exame
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                      >
+                        {store.settings.methods.map((m) => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+                <p className="subtle-note">
+                  Sem marcar o pagamento, o exame fica a receber. Só
+                  recebimentos confirmados entram no Financeiro.
+                </p>
+              </>
+            ) : (
+              <p className="subtle-note">
+                Configure o valor do exame em Horários e pagamentos para gerar
+                cobranças.
+              </p>
+            )}
+          </div>
         </div>
         <FormActions onClose={onClose} label="Salvar avaliação" />
       </form>
@@ -1009,7 +1077,7 @@ function ProductForm({
   productId?: string;
   onClose: () => void;
 }) {
-  const { store, execute, saving, notify } = useStudio();
+  const { store, execute, saving, notify, mode } = useStudio();
   const existing = store.products.find((p) => p.id === productId);
   const [form, setForm] = useState<Product>(
     existing
@@ -1017,7 +1085,9 @@ function ProductForm({
       : {
           id: uid(),
           name: "",
-          category: "Suplementos",
+          category: store.settings.productCategories.includes("Suplementos")
+            ? "Suplementos"
+            : store.settings.productCategories[0],
           price: 1,
           stock: 0,
           variant: "",
@@ -1025,13 +1095,17 @@ function ProductForm({
         },
   );
   const [error, setError] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | undefined>();
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [preview, setPreview] = useState("");
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (saving || photoLoading) return;
     try {
       await execute({
         type: "save_product",
         product: { ...form, name: form.name.trim() },
+        file: mode === "supabase" ? photoFile : undefined,
       });
       notify(existing ? "Produto atualizado." : "Produto cadastrado.");
       onClose();
@@ -1061,12 +1135,13 @@ function ProductForm({
           <label className="field">
             Categoria
             <select
+              aria-label="Categoria"
               value={form.category}
               onChange={(e) =>
                 setForm((f) => ({ ...f, category: e.target.value }))
               }
             >
-              {["Suplementos", "Alimentos", "Acessórios"].map((c) => (
+              {store.settings.productCategories.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
@@ -1119,13 +1194,169 @@ function ProductForm({
               }
             />
           </label>
+          <div className="product-image-editor">
+            {preview ? (
+              <img src={preview} alt="Prévia da foto do produto" />
+            ) : (
+              <ProductImage product={form} />
+            )}
+            <label className="button secondary">
+              Escolher foto da galeria
+              <input
+                aria-label="Foto do produto"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={saving || photoLoading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (
+                    file.size > 2 * 1024 * 1024 ||
+                    !["image/png", "image/jpeg", "image/webp"].includes(
+                      file.type,
+                    )
+                  ) {
+                    setError("Use foto PNG, JPEG ou WebP de até 2 MB.");
+                    e.target.value = "";
+                    return;
+                  }
+                  setPhotoLoading(true);
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const src = String(reader.result);
+                    setPreview(src);
+                    setPhotoFile(file);
+                    if (mode === "demo") setForm((f) => ({ ...f, photo: src }));
+                    setPhotoLoading(false);
+                    setError("");
+                  };
+                  reader.onerror = () => {
+                    setPhotoLoading(false);
+                    setError("Não foi possível abrir a foto.");
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="text-button"
+              disabled={saving || photoLoading}
+              onClick={() => {
+                setPreview("");
+                setPhotoFile(undefined);
+                setForm((f) => ({ ...f, photo: undefined, photoPath: null }));
+              }}
+            >
+              Usar imagem padrão da categoria
+            </button>
+            <p className="subtle-note">PNG, JPEG ou WebP de até 2 MB.</p>
+          </div>
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
         </div>
-        <FormActions onClose={onClose} label="Salvar produto" />
+        <FormActions
+          onClose={onClose}
+          label="Salvar produto"
+          disabled={photoLoading}
+        />
+      </form>
+    </Modal>
+  );
+}
+
+function EvaluationPaymentForm({
+  evaluationId,
+  onClose,
+}: {
+  evaluationId: string;
+  onClose: () => void;
+}) {
+  const { store, execute, saving, notify } = useStudio();
+  const evaluation = store.evaluations.find((e) => e.id === evaluationId);
+  const balance = evaluation ? evaluationBalance(evaluation) : 0;
+  const [amount, setAmount] = useState(balance);
+  const [date, setDate] = useState(today);
+  const [method, setMethod] = useState(store.settings.methods[0]);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <Modal
+      title="Receber bioimpedância"
+      subtitle={
+        store.students.find((s) => s.id === evaluation?.studentId)?.name
+      }
+      onClose={onClose}
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (saving || !evaluation) return;
+          try {
+            await execute({
+              type: "record_evaluation_payment",
+              evaluationId,
+              payment: { id: uid(), amount, date, method, note },
+            });
+            notify("Recebimento do exame registrado.");
+            onClose();
+          } catch (e) {
+            setError(
+              e instanceof Error ? e.message : "Não foi possível receber.",
+            );
+          }
+        }}
+      >
+        <div className="modal-content">
+          <p className="selected-plan">Saldo do exame: {currency(balance)}</p>
+          <label className="field">
+            Valor recebido do exame (R$)
+            <input
+              required
+              type="number"
+              min="0.01"
+              max={balance}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            Data do recebimento do exame
+            <input
+              required
+              type="date"
+              max={today}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </label>
+          <label className="field">
+            Forma de pagamento do exame
+            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              {store.settings.methods.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Observação do recebimento
+            <input value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+        <FormActions
+          onClose={onClose}
+          label="Confirmar recebimento do exame"
+          disabled={balance <= 0}
+        />
       </form>
     </Modal>
   );

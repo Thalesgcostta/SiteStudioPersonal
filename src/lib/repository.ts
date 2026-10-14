@@ -1,18 +1,33 @@
 import type { Store } from "../data";
-import { uid } from "../data";
+import { uid, upgradeStore } from "../data";
 import { assertStore } from "./actions";
 import type { StudioAction } from "./actions";
 import { errorMessage, supabase } from "./supabase";
+let serverVersion = 0;
 
 export async function loadRemoteStore(): Promise<Store> {
   if (!supabase) throw new Error("Supabase não configurado.");
   const { data, error } = await supabase.rpc("get_studio_state");
   if (error) throw new Error(errorMessage(error));
   assertStore(data);
-  return data;
+  serverVersion = data.schemaVersion || 1;
+  return upgradeStore({ ...data, schemaVersion: serverVersion });
 }
 export async function applyRemoteAction(action: StudioAction): Promise<Store> {
   if (!supabase) throw new Error("Supabase não configurado.");
+  if (
+    serverVersion < 3 &&
+    (["save_settings", "save_dashboard", "record_evaluation_payment"].includes(
+      action.type,
+    ) ||
+      (action.type === "save_product" &&
+        (action.file || action.product.photoPath !== undefined)) ||
+      (action.type === "record_evaluation" &&
+        (action.evaluation.charge > 0 || action.payment)))
+  )
+    throw new Error(
+      "Execute a migração 202610140003_studio_management.sql no Supabase para usar esta função.",
+    );
   if (action.type === "reset_demo")
     throw new Error(
       "Restaurar exemplos só está disponível no modo de demonstração.",
@@ -20,6 +35,40 @@ export async function applyRemoteAction(action: StudioAction): Promise<Store> {
   const requestId = uid();
   const { type, ...rest } = action;
   const payload: Record<string, unknown> = { ...rest };
+  delete payload.file;
+  if (action.type === "save_product") {
+    const product = { ...action.product };
+    delete product.photo;
+    if (action.file) {
+      if (
+        action.file.size > 2 * 1024 * 1024 ||
+        !["image/png", "image/jpeg", "image/webp"].includes(action.file.type)
+      )
+        throw new Error("Use uma foto PNG, JPEG ou WebP de até 2 MB.");
+      const { data: auth, error } = await supabase.auth.getUser();
+      if (error || !auth.user)
+        throw new Error("Entre novamente para enviar a foto.");
+      const ext =
+        action.file.type === "image/png"
+          ? "png"
+          : action.file.type === "image/webp"
+            ? "webp"
+            : "jpg";
+      const path = `products/${auth.user.id}/${product.id}/${uid()}.${ext}`;
+      const upload = await supabase.storage
+        .from("product-images")
+        .upload(path, action.file, {
+          contentType: action.file.type,
+          upsert: false,
+        });
+      if (upload.error)
+        throw new Error(
+          "Não foi possível enviar a foto. Confira a migração 003 e a conexão.",
+        );
+      product.photoPath = path;
+    }
+    payload.product = product;
+  }
   if (action.type === "record_payment") {
     delete payload.file;
     if (action.file) {
@@ -74,7 +123,11 @@ export async function applyRemoteAction(action: StudioAction): Promise<Store> {
     });
   if (response.error) throw new Error(errorMessage(response.error));
   assertStore(response.data);
-  return response.data;
+  serverVersion = response.data.schemaVersion || 1;
+  return upgradeStore({
+    ...response.data,
+    schemaVersion: response.data.schemaVersion || 1,
+  });
 }
 export async function downloadReceipt(path: string, name: string) {
   if (!supabase)

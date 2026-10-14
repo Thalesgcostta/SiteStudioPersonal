@@ -10,9 +10,11 @@ export type ModalRequest = {
     | "appointment"
     | "movement"
     | "product"
+    | "evaluation_payment"
     | "confirm";
   studentId?: string;
   productId?: string;
+  evaluationId?: string;
   title?: string;
   message?: string;
   onConfirm?: () => void | Promise<void>;
@@ -22,6 +24,7 @@ export type StudioContext = {
   execute: (action: StudioAction) => Promise<Store>;
   saving: boolean;
   mode: string;
+  user: { id: string; name: string; email: string; firstName: string };
   displayScale: DisplayScale;
   setDisplayScale: (scale: DisplayScale) => void;
   displayStorageError: boolean;

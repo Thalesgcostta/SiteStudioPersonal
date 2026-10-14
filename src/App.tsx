@@ -53,6 +53,32 @@ const routeNow = () => window.location.hash.slice(1) || "dashboard";
 export default function App() {
   const data = useStudioData();
   const display = useDisplaySettings();
+  const account = data.session?.user;
+  const rawName =
+    account?.user_metadata?.full_name ||
+    account?.user_metadata?.name ||
+    account?.user_metadata?.display_name;
+  const name =
+    typeof rawName === "string" && rawName.trim()
+      ? rawName.trim()
+      : account?.email
+          ?.split("@")[0]
+          .replace(/[._-]/g, " ")
+          .replace(/\b\p{L}/gu, (c) => c.toUpperCase()) || "Administrador";
+  const user =
+    data.mode === "demo"
+      ? {
+          id: "demo",
+          name: "Katielle Faleiros",
+          firstName: "Katielle",
+          email: "demo@studio.exemplo",
+        }
+      : {
+          id: account?.id || "",
+          name,
+          firstName: name.split(" ")[0],
+          email: account?.email || "",
+        };
   const {
     store,
     execute,
@@ -166,6 +192,7 @@ export default function App() {
         execute,
         saving,
         mode,
+        user,
         displayScale: display.scale,
         setDisplayScale: display.setScale,
         displayStorageError: display.storageError,
@@ -271,10 +298,10 @@ export default function App() {
               Área administrativa privada
             </div>
             <div className="sidebar-user">
-              <Avatar name="Katielle Faleiros" />
+              <Avatar name={user.name} />
               <div>
-                <strong>Katielle Faleiros</strong>
-                <span>Administradora</span>
+                <strong>{user.name}</strong>
+                <span>Administrador(a)</span>
               </div>
               <button
                 className="icon-button"
@@ -363,18 +390,18 @@ export default function App() {
               <div className="popover-anchor">
                 <button
                   className="user-button"
-                  aria-label="Menu da administradora"
+                  aria-label="Menu do usuário"
                   aria-expanded={popover === "user"}
                   onClick={() => setPopover(popover === "user" ? "" : "user")}
                 >
-                  <Avatar name="Katielle Faleiros" size="small" />
-                  <span>Katielle</span>
+                  <Avatar name={user.name} size="small" />
+                  <span>{user.firstName}</span>
                   <ChevronDown size={13} />
                 </button>
                 {popover === "user" && (
                   <div className="popover user-popover">
-                    <strong>Katielle Faleiros</strong>
-                    <span>Administradora do studio</span>
+                    <strong>{user.name}</strong>
+                    <span>{user.email}</span>
                     <button onClick={() => go("configuracoes")}>
                       <SettingsIcon size={16} />
                       Dados do studio
@@ -430,6 +457,15 @@ export default function App() {
             className="main-content"
             key={route}
           >
+            {mode === "supabase" && store.schemaVersion < 3 && (
+              <div className="storage-notice" role="status">
+                Atualização do banco pendente: execute
+                202610140003_studio_management.sql no SQL Editor do Supabase
+                para liberar as novas configurações, cobranças de exames e
+                fotos. Os registros e os fluxos existentes continuam
+                disponíveis.
+              </div>
+            )}
             {storageError && (
               <div className="storage-notice">
                 O navegador não permitiu salvar os dados. As alterações

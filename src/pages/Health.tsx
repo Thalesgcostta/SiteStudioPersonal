@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Avatar, Empty, PageIntro, Panel } from "../components";
+import { StudentPicker } from "../StudentPicker";
 import { useStudio } from "../context";
-import { dateLabel, normalize, today } from "../data";
+import { dateLabel, normalize, today, currency, evaluationPaid } from "../data";
 import type { Evaluation } from "../data";
 const metrics: {
   key: keyof Evaluation | "bmi";
@@ -94,25 +95,15 @@ export function Health() {
         }
       />
       <div className="health-toolbar">
-        <label className="field">
-          Aluno
-          <select
-            value={student}
-            onChange={(e) => {
-              setStudent(e.target.value);
-              setCompareA("");
-              setCompareB("");
-            }}
-          >
-            {store.students
-              .filter((s) => normalize(s.name).includes(normalize(search)))
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <StudentPicker
+          students={matchingStudents}
+          value={student}
+          onChange={(id) => {
+            setStudent(id);
+            setCompareA("");
+            setCompareB("");
+          }}
+        />
         <div className="fictitious-label">
           <Activity size={15} />
           {mode === "demo"
@@ -137,6 +128,44 @@ export function Health() {
             Ver perfil <ArrowRight size={14} />
           </button>
         </div>
+      )}
+      {list.some((e) => e.charge > 0) && (
+        <Panel
+          title="Exames e recebimentos"
+          subtitle="Somente pagamentos confirmados entram no Financeiro."
+        >
+          <div className="exam-receivables">
+            {[...list]
+              .reverse()
+              .filter((e) => e.charge > 0)
+              .map((e) => (
+                <div className="exam-receivable" key={e.id}>
+                  <div>
+                    <strong>Exame de {dateLabel(e.date)}</strong>
+                    <p>
+                      Valor: {currency(e.charge)} · Recebido:{" "}
+                      {currency(evaluationPaid(e))}
+                    </p>
+                  </div>
+                  <strong>
+                    Saldo: {currency(Math.max(0, e.charge - evaluationPaid(e)))}
+                  </strong>
+                  {e.charge > evaluationPaid(e) ? (
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        open({ type: "evaluation_payment", evaluationId: e.id })
+                      }
+                    >
+                      Receber exame
+                    </button>
+                  ) : (
+                    <span className="status status-pago">Pago</span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </Panel>
       )}
       <div className="page-tabs">
         <button
@@ -241,6 +270,7 @@ export function Health() {
                   <th>Músculo</th>
                   <th>Visceral</th>
                   <th>Água</th>
+                  <th>Cobrança do exame</th>
                   <th />
                 </tr>
               </thead>
@@ -256,7 +286,36 @@ export function Health() {
                     <td>{e.visceral}</td>
                     <td>{e.water.toFixed(1)}%</td>
                     <td>
+                      <strong>{currency(e.charge)}</strong>
+                      <small>
+                        {e.charge === 0
+                          ? "Sem cobrança"
+                          : evaluationPaid(e) >= e.charge
+                            ? "Pago"
+                            : `Saldo: ${currency(e.charge - evaluationPaid(e))}`}
+                      </small>
+                      {e.charge > evaluationPaid(e) && (
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            open({
+                              type: "evaluation_payment",
+                              evaluationId: e.id,
+                            })
+                          }
+                        >
+                          Receber exame
+                        </button>
+                      )}
+                    </td>
+                    <td>
                       <button
+                        disabled={e.payments.length > 0}
+                        title={
+                          e.payments.length
+                            ? "Avaliação com recebimentos não pode ser excluída."
+                            : undefined
+                        }
                         className="icon-button danger"
                         aria-label={`Excluir avaliação de ${dateLabel(e.date)}`}
                         onClick={() =>
