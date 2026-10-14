@@ -9,7 +9,7 @@ import { PGlite } from "@electric-sql/pglite";
 let db;
 const admin = "11111111-1111-4111-8111-111111111111";
 const outsider = "22222222-2222-4222-8222-222222222222";
-let today, month, legacySnapshot;
+let today, month, legacySnapshot, legacyProductSnapshot;
 const student = () => ({
   id: randomUUID(),
   name: "Aluno de teste",
@@ -97,6 +97,34 @@ before(async () => {
     [randomUUID(), admin],
   );
   await db.exec(management);
+  const inventory = await readFile(
+    new URL(
+      "../supabase/migrations/202610140004_product_inventory.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const legacyProductId = randomUUID();
+  const legacySaleId = randomUUID();
+  await db.query(
+    "insert into public.products(id,name,category,price,stock,variant,color,photo_path,version) values($1,'Produto anterior','Suplementos',55,4,'300 g','#579aba','products/foto-anterior.png',7)",
+    [legacyProductId],
+  );
+  await db.query(
+    "insert into public.sales(id,sold_on,discount,subtotal,method,created_by) values($1,'2026-09-10',0,110,'Pix',$2)",
+    [legacySaleId, admin],
+  );
+  await db.query(
+    "insert into public.sale_items(sale_id,product_id,quantity,price) values($1,$2,2,55)",
+    [legacySaleId, legacyProductId],
+  );
+  await db.exec(inventory);
+  legacyProductSnapshot = (
+    await db.query(
+      "select p.name,p.stock,p.photo_path,p.version,p.illustration,p.deleted_at,i.price,i.quantity,s.subtotal from public.products p join public.sale_items i on i.product_id=p.id join public.sales s on s.id=i.sale_id where p.id=$1",
+      [legacyProductId],
+    )
+  ).rows[0];
   legacySnapshot = (
     await db.query(
       "select s.name,b.amount,r.amount as received,e.notes,e.charge from public.students s join public.bills b on b.student_id=s.id join public.receipts r on r.bill_id=b.id join public.evaluations e on e.student_id=s.id",
@@ -106,6 +134,7 @@ before(async () => {
   await db.exec(sql);
   await db.exec(storage);
   await db.exec(management);
+  await db.exec(inventory);
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -469,7 +498,7 @@ test("usuário criado no Authentication recebe papel administrativo automaticame
   await db.exec("reset role");
   await db.query("insert into auth.users(id) values($1)", [id]);
   await role(id);
-  assert.equal((await state()).schemaVersion, 3);
+  assert.equal((await state()).schemaVersion, 4);
 });
 test("capacidade bloqueia novos encaixes e reativação, mas preserva horários antigos", async () => {
   const first = student();
@@ -723,4 +752,153 @@ test("migração preserva cadastros, cobrança e recebimento anteriores sem cobr
   assert.equal(Number(legacySnapshot.received), 100);
   assert.equal(legacySnapshot.notes, "Histórico anterior");
   assert.equal(Number(legacySnapshot.charge), 0);
+});
+
+test("estoque e ilustração podem ser editados sem alterar valores das vendas anteriores", async () => {
+  const initial = {
+    id: randomUUID(),
+    name: "Pré-treino teste",
+    category: "Suplementos",
+    price: 45,
+    stock: 3,
+    variant: "200 g",
+    color: "#579aba",
+    illustration: "pre-workout",
+  };
+  let store = await action("save_product", { product: initial });
+  assert.equal(store.products[0].illustration, "pre-workout");
+  await action("record_sale", {
+    sale: {
+      id: randomUUID(),
+      date: today,
+      studentId: "",
+      discount: 0,
+      method: "Pix",
+      items: [{ productId: initial.id, quantity: 1, price: 45 }],
+    },
+  });
+  const current = (await state()).products[0];
+  store = await action("save_product", {
+    product: {
+      ...current,
+      name: "Pré-treino atualizado",
+      category: "Acessórios",
+      price: 50,
+      stock: 12,
+      variant: "Novo lote",
+      color: "#ff6800",
+      illustration: "dumbbell",
+    },
+  });
+  assert.equal(store.products[0].stock, 12);
+  assert.equal(store.products[0].price, 50);
+  assert.equal(store.products[0].category, "Acessórios");
+  assert.equal(store.products[0].variant, "Novo lote");
+  assert.equal(store.products[0].color, "#ff6800");
+  assert.equal(store.products[0].illustration, "dumbbell");
+  assert.equal(store.sales[0].items[0].price, 45);
+  assert.equal(
+    (await db.query("select subtotal from public.sales")).rows[0].subtotal,
+    "45.00",
+  );
+  for (const invalid of [
+    { stock: -1 },
+    { stock: 1.5 },
+    { illustration: "unknown" },
+  ])
+    await assert.rejects(() =>
+      action("save_product", { product: { ...store.products[0], ...invalid } }),
+    );
+  assert.equal((await state()).products[0].stock, 12);
+  const { illustration: _illustration, ...oldClientProduct } =
+    store.products[0];
+  store = await action("save_product", {
+    product: { ...oldClientProduct, stock: 0 },
+  });
+  assert.equal(store.products[0].illustration, "dumbbell");
+  assert.equal(store.products[0].stock, 0);
+});
+
+test("exclusão preserva vendas, é idempotente e impede venda ou reativação do produto", async () => {
+  const original = (
+    await action("save_product", {
+      product: {
+        id: randomUUID(),
+        name: "Barra histórica",
+        category: "Alimentos",
+        price: 12,
+        stock: 6,
+        variant: "Chocolate",
+        color: "#579aba",
+        illustration: "protein-bar",
+      },
+    })
+  ).products[0];
+  const sale = {
+    id: randomUUID(),
+    date: today,
+    studentId: "",
+    discount: 0,
+    method: "Pix",
+    items: [{ productId: original.id, quantity: 2, price: 12 }],
+  };
+  await action("record_sale", { sale });
+  await assert.rejects(
+    () =>
+      action("delete_product", { id: original.id, version: original.version }),
+    /outra sessão/,
+  );
+  let store = await state();
+  assert.equal(store.products[0].deletedAt, null);
+  const current = store.products[0];
+  await role(outsider);
+  await assert.rejects(
+    () =>
+      action("delete_product", { id: current.id, version: current.version }),
+    /Acesso restrito/,
+  );
+  await role();
+  const requestId = randomUUID();
+  const payload = { id: current.id, version: current.version };
+  store = await action("delete_product", payload, requestId);
+  const deleted = store.products[0];
+  assert.ok(deleted.deletedAt);
+  assert.equal(deleted.stock, 4);
+  assert.equal(deleted.version, current.version + 1);
+  assert.equal(deleted.name, "Barra histórica");
+  assert.deepEqual(store.sales[0].items, sale.items);
+  assert.equal(store.products.filter((p) => !p.deletedAt).length, 0);
+  store = await action("delete_product", payload, requestId);
+  assert.equal(store.products[0].deletedAt, deleted.deletedAt);
+  assert.equal(store.products[0].version, deleted.version);
+  await assert.rejects(
+    () => action("record_sale", { sale: { ...sale, id: randomUUID() } }),
+    /excluído/,
+  );
+  await assert.rejects(
+    () => action("save_product", { product: { ...deleted, deletedAt: null } }),
+    /excluído/,
+  );
+  await assert.rejects(
+    () =>
+      action("delete_product", { id: deleted.id, version: deleted.version }),
+    /excluído/,
+  );
+  store = await state();
+  assert.equal(store.sales.length, 1);
+  assert.equal(store.products[0].stock, 4);
+});
+
+test("migração de estoque preserva produtos, fotos e vendas de versões anteriores", () => {
+  assert.deepEqual(legacyProductSnapshot, {
+    name: "Produto anterior",
+    stock: 4,
+    photo_path: "products/foto-anterior.png",
+    version: 7,
+    illustration: "category",
+    deleted_at: null,
+    price: "55.00",
+    quantity: 2,
+    subtotal: "110.00",
+  });
 });

@@ -16,6 +16,16 @@ export async function loadRemoteStore(): Promise<Store> {
 export async function applyRemoteAction(action: StudioAction): Promise<Store> {
   if (!supabase) throw new Error("Supabase não configurado.");
   if (
+    serverVersion < 4 &&
+    (action.type === "delete_product" ||
+      (action.type === "save_product" &&
+        action.product.illustration &&
+        action.product.illustration !== "category"))
+  )
+    throw new Error(
+      "Execute a migração 202610140004_product_inventory.sql no Supabase para usar exclusão e desenhos de produtos.",
+    );
+  if (
     serverVersion < 3 &&
     (["save_settings", "save_dashboard", "record_evaluation_payment"].includes(
       action.type,

@@ -18,8 +18,9 @@ Abra **SQL Editor → New query**. Copie o conteúdo completo dos arquivos abaix
 1. [`supabase/migrations/202610090001_studio.sql`](../supabase/migrations/202610090001_studio.sql)
 2. [`supabase/migrations/202610090002_private_storage.sql`](../supabase/migrations/202610090002_private_storage.sql)
 3. [`supabase/migrations/202610140003_studio_management.sql`](../supabase/migrations/202610140003_studio_management.sql)
+4. [`supabase/migrations/202610140004_product_inventory.sql`](../supabase/migrations/202610140004_product_inventory.sql)
 
-Antes da migração 003, mantenha o cadastro público de Authentication desabilitado. Ela autoriza os usuários existentes e os próximos usuários criados como administradores. Para atualizar um projeto que já executou 001 e 002, siga [o guia de atualização](ATUALIZACAO_GESTAO.md) e execute somente 003.
+Antes da migração 003, mantenha o cadastro público de Authentication desabilitado. Ela autoriza os usuários existentes e os próximos usuários criados como administradores. Para atualizar um projeto que já executou 001 e 002, siga [o guia de gestão](ATUALIZACAO_GESTAO.md) para aplicar 003 e [o guia de estoque](ATUALIZACAO_ESTOQUE.md) para aplicar 004. Se já executou 003, apenas 004 é necessária.
 
 A primeira migração cria cadastros, planos, horários, mensalidades, recebimentos, avaliações, agendamentos, produtos, vendas, movimentações e configurações. Ela ativa RLS e permite alterações somente pelas funções transacionais da aplicação, depois de verificar a autorização administrativa. A segunda cria o bucket privado `studio-documents`.
 

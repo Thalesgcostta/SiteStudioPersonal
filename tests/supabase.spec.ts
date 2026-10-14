@@ -74,6 +74,12 @@ test.beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/202610140004_product_inventory.sql",
+      "utf8",
+    ),
+  );
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -99,7 +105,8 @@ async function mock(
   {
     failLoad = false,
     legacy = false,
-  }: { failLoad?: boolean; legacy?: boolean } = {},
+    inventoryLegacy = false,
+  }: { failLoad?: boolean; legacy?: boolean; inventoryLegacy?: boolean } = {},
 ) {
   let fullName = "Thales Costa";
   await page.route(backend + "/**", async (route) => {
@@ -196,6 +203,13 @@ async function mock(
             for (const e of data.evaluations) {
               delete e.charge;
               delete e.payments;
+            }
+          }
+          if (inventoryLegacy) {
+            data.schemaVersion = 3;
+            for (const p of data.products) {
+              delete p.illustration;
+              delete p.deletedAt;
             }
           }
           return respond(data);
@@ -783,4 +797,235 @@ test("saldo de exame com centavos permite quitar o valor exato no formulário", 
       )
     ).rows[0].total,
   ).toBe("17.30");
+});
+
+test("controle de estoque edita quantidades e dados completos, com desenho persistente", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await mock(page);
+  await login(page);
+  await navigate(page, "Vendas de produtos");
+  await page
+    .getByRole("button", { name: "Cadastrar produto", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".illustration-option")).toHaveCount(12);
+  await dialog.getByLabel("Nome do produto *").fill("Pré-treino Energia");
+  await dialog.getByLabel("Preço (R$) *").fill("80");
+  await dialog.getByLabel("Estoque disponível *").fill("5");
+  await dialog.getByLabel("Foto do produto").setInputFiles({
+    name: "produto.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await expect(
+    dialog.getByRole("img", { name: "Prévia da foto do produto", exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Ilustração: Pré-treino", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Ilustração: Pré-treino", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.getByLabel("Foto do produto")).toHaveValue("");
+  await dialog
+    .getByRole("button", { name: "Salvar produto", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await page
+    .getByLabel("Quantidade em estoque de Pré-treino Energia", { exact: true })
+    .fill("12");
+  await page
+    .getByRole("button", {
+      name: "Salvar estoque de Pré-treino Energia",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Estoque de Pré-treino Energia atualizado",
+  );
+  await page
+    .getByRole("button", { name: "Editar Pré-treino Energia", exact: true })
+    .click();
+  await dialog.getByLabel("Nome do produto *").fill("Barra Power");
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("Alimentos");
+  await dialog.getByLabel("Preço (R$) *").fill("15");
+  await dialog.getByLabel("Variação / descrição").fill("Chocolate · 60 g");
+  await dialog.getByLabel("Cor da ilustração").fill("#ff6800");
+  await dialog
+    .getByRole("button", { name: "Ilustração: Barra de proteína", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Salvar produto", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  let row = page.locator(".inventory-table tbody tr");
+  await expect(row).toContainText("Barra Power");
+  await expect(row).toContainText("Alimentos");
+  await expect(row).toContainText("R$ 15,00");
+  await expect(row).toContainText("Chocolate · 60 g");
+  await expect(
+    page.getByLabel("Quantidade em estoque de Barra Power", { exact: true }),
+  ).toHaveValue("12");
+  const saved = (
+    await db.query<{ illustration: string; stock: number; color: string }>(
+      "select illustration,stock,color from public.products",
+    )
+  ).rows[0];
+  expect(saved).toEqual({
+    illustration: "protein-bar",
+    stock: 12,
+    color: "#ff6800",
+  });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Quantidade em estoque de Barra Power", { exact: true }),
+  ).toHaveValue("12");
+  await page
+    .getByLabel("Buscar produto no estoque", { exact: true })
+    .fill("chocolate");
+  await expect(page.locator(".inventory-table tbody tr")).toHaveCount(1);
+  await page
+    .getByLabel("Situação do estoque", { exact: true })
+    .selectOption("low");
+  await expect(page.locator(".inventory-table tbody tr")).toHaveCount(0);
+  await page
+    .getByLabel("Situação do estoque", { exact: true })
+    .selectOption("all");
+  await page
+    .getByLabel("Quantidade em estoque de Barra Power", { exact: true })
+    .fill("0");
+  await page
+    .getByRole("button", { name: "Salvar estoque de Barra Power", exact: true })
+    .click();
+  await expect(page.locator(".stock-status")).toHaveText("Sem estoque");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const widths = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    screen: innerWidth,
+  }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.screen + 1);
+  await page.screenshot({
+    path: "/tmp/studio-inventory-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("excluir produto limpa catálogo e carrinho, mantendo histórico e receita após recarregar", async ({
+  page,
+}) => {
+  await action("save_product", {
+    product: {
+      id: randomUUID(),
+      name: "Barra do histórico",
+      category: "Alimentos",
+      price: 20,
+      stock: 5,
+      variant: "60 g",
+      color: "#579aba",
+      illustration: "protein-bar",
+    },
+  });
+  await mock(page);
+  await login(page);
+  await navigate(page, "Vendas de produtos");
+  await page
+    .getByRole("button", { name: "Adicionar à venda", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Finalizar venda", exact: true })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Venda registrada",
+  );
+  await page
+    .getByRole("button", { name: "Adicionar à venda", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Excluir Barra do histórico", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("histórico de vendas será preservado");
+  await dialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(page.locator(".inventory-table tbody tr")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Excluir Barra do histórico", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".inventory-table tbody tr")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Catálogo e venda", exact: true })
+    .click();
+  await expect(page.locator(".product-card")).toHaveCount(0);
+  await expect(page.locator(".cart-item")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Histórico de vendas", exact: false })
+    .click();
+  await expect(page.locator("tbody tr")).toContainText("Barra do histórico");
+  await expect(page.locator("tbody tr")).toContainText("R$ 20,00");
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Histórico de vendas", exact: false })
+    .click();
+  await expect(page.locator("tbody tr")).toContainText("Barra do histórico");
+  await navigate(page, "Financeiro");
+  await page
+    .getByRole("group", { name: "Origem dos valores do financeiro" })
+    .getByRole("button", { name: "Produtos", exact: true })
+    .click();
+  await expect(page.locator(".metric").first()).toContainText("R$ 20,00");
+});
+
+test("banco com migração 003 mantém estoque acessível e bloqueia exclusão e novos desenhos", async ({
+  page,
+}) => {
+  await action("save_product", {
+    product: {
+      id: randomUUID(),
+      name: "Produto legado",
+      category: "Suplementos",
+      price: 30,
+      stock: 8,
+      variant: "300 g",
+      color: "#579aba",
+    },
+  });
+  await mock(page, { inventoryLegacy: true });
+  await login(page);
+  await expect(page.locator(".storage-notice")).toContainText(
+    "202610140004_product_inventory.sql",
+  );
+  await navigate(page, "Vendas de produtos");
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Quantidade em estoque de Produto legado", { exact: true }),
+  ).toHaveValue("8");
+  await expect(
+    page.getByRole("button", { name: "Excluir Produto legado", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Editar Produto legado", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Ilustração: Pré-treino", exact: true }),
+  ).toBeDisabled();
 });

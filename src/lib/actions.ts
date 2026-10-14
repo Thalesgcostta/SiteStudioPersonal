@@ -40,6 +40,7 @@ export type StudioAction =
   | { type: "save_appointment"; appointment: Appointment }
   | { type: "delete_appointment"; id: string }
   | { type: "save_product"; product: Product; file?: File }
+  | { type: "delete_product"; id: string; version?: number }
   | { type: "record_sale"; sale: Sale }
   | { type: "record_movement"; movement: Movement }
   | { type: "delete_movement"; id: string }
@@ -48,7 +49,7 @@ export type StudioAction =
   | { type: "reset_demo" };
 
 export const emptyStore = (): Store => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   students: [],
   bills: [],
   evaluations: [],
@@ -213,13 +214,54 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
         ...s,
         appointments: s.appointments.filter((x) => x.id !== a.id),
       };
-    case "save_product":
+    case "save_product": {
+      const existing = s.products.find((x) => x.id === a.product.id);
+      if (existing?.deletedAt) throw new Error("Este produto já foi excluído.");
+      if (existing && (existing.version ?? 1) !== (a.product.version ?? 1))
+        throw new Error(
+          "O produto foi alterado em outra sessão. Atualize o catálogo antes de editar.",
+        );
+      if (
+        !Number.isInteger(a.product.stock) ||
+        a.product.stock < 0 ||
+        !Number.isFinite(a.product.price) ||
+        a.product.price <= 0 ||
+        a.product.name.trim().length < 3
+      )
+        throw new Error("Informe nome, preço e quantidade em estoque válidos.");
+      const product = {
+        ...a.product,
+        deletedAt: null,
+        version: (existing ? (existing.version ?? 1) : 0) + 1,
+      };
       return {
         ...s,
-        products: s.products.some((x) => x.id === a.product.id)
-          ? s.products.map((x) => (x.id === a.product.id ? a.product : x))
-          : [...s.products, a.product],
+        products: existing
+          ? s.products.map((x) => (x.id === product.id ? product : x))
+          : [...s.products, product],
       };
+    }
+    case "delete_product": {
+      const product = s.products.find((x) => x.id === a.id);
+      if (!product || product.deletedAt)
+        throw new Error("Produto não encontrado ou já excluído.");
+      if ((product.version ?? 1) !== (a.version ?? 1))
+        throw new Error(
+          "O produto foi alterado em outra sessão. Atualize o estoque antes de excluir.",
+        );
+      return {
+        ...s,
+        products: s.products.map((x) =>
+          x.id === a.id
+            ? {
+                ...x,
+                deletedAt: new Date().toISOString(),
+                version: (x.version ?? 1) + 1,
+              }
+            : x,
+        ),
+      };
+    }
     case "record_sale": {
       if (
         a.sale.items.some(
@@ -227,6 +269,7 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
             !s.products.some(
               (p) =>
                 p.id === i.productId &&
+                !p.deletedAt &&
                 p.stock >= i.quantity &&
                 p.price === i.price,
             ),
@@ -241,6 +284,9 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
           stock:
             x.stock -
             (a.sale.items.find((i) => i.productId === x.id)?.quantity || 0),
+          version:
+            (x.version ?? 1) +
+            (a.sale.items.some((i) => i.productId === x.id) ? 1 : 0),
         })),
       };
     }

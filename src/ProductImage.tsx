@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Package } from "lucide-react";
 import { ProductArt } from "./components";
+import { ProductIllustration } from "./ProductIllustration";
 import { supabase } from "./lib/supabase";
 import { useStudio } from "./context";
 import type { Product } from "./data";
@@ -48,6 +49,14 @@ export function ProductImage({ product }: { product: Product }) {
           setBroken(true);
           setUrl("");
         }}
+      />
+    );
+  if (product.illustration && product.illustration !== "category")
+    return (
+      <ProductIllustration
+        illustration={product.illustration}
+        name={product.name}
+        color={product.color}
       />
     );
   const defaults =

@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import { Empty, PageIntro, Panel } from "../components";
 import { ProductImage } from "../ProductImage";
+import { ProductInventory } from "./ProductInventory";
 import { useStudio } from "../context";
 import {
   currency,
@@ -31,21 +32,20 @@ export function Products() {
   const [method, setMethod] = useState(store.settings.methods[0] || methods[0]);
   const [tab, setTab] = useState("catalog");
   const [error, setError] = useState("");
-  const items = Object.entries(cart)
-    .filter(([, q]) => q > 0)
-    .map(([id, quantity]) => ({
-      product: store.products.find((p) => p.id === id)!,
-      quantity,
-    }));
+  const activeProducts = store.products.filter((p) => !p.deletedAt);
+  const items = activeProducts
+    .filter((p) => (cart[p.id] || 0) > 0)
+    .map((product) => ({ product, quantity: cart[product.id] }));
   const subtotal = items.reduce((a, i) => a + i.product.price * i.quantity, 0);
   const total = subtotal - discount;
-  const filtered = store.products.filter(
+  const filtered = activeProducts.filter(
     (p) =>
       (category === "Todos" || p.category === category) &&
       normalize(p.name).includes(normalize(query || search)),
   );
   const change = (id: string, n: number) => {
-    const p = store.products.find((p) => p.id === id)!;
+    const p = activeProducts.find((p) => p.id === id);
+    if (!p) return;
     const quantity = (cart[id] || 0) + n;
     if (quantity > p.stock) {
       notify("Quantidade máxima disponível em estoque.");
@@ -139,6 +139,12 @@ export function Products() {
           onClick={() => setTab("history")}
         >
           Histórico de vendas <span>{sales.length}</span>
+        </button>
+        <button
+          className={tab === "inventory" ? "active" : ""}
+          onClick={() => setTab("inventory")}
+        >
+          Controle de estoque
         </button>
       </div>
       {tab === "catalog" ? (
@@ -336,6 +342,8 @@ export function Products() {
             </div>
           </Panel>
         </div>
+      ) : tab === "inventory" ? (
+        <ProductInventory />
       ) : (
         <>
           <div className="sales-summary">
@@ -360,7 +368,7 @@ export function Products() {
               title="Atenção ao estoque"
               subtitle="Produtos com até 3 unidades"
             >
-              {store.products
+              {activeProducts
                 .filter((p) => p.stock <= 3)
                 .map((p) => (
                   <div className="stock-alert" key={p.id}>
@@ -371,7 +379,7 @@ export function Products() {
                     </div>
                   </div>
                 ))}
-              {!store.products.some((p) => p.stock <= 3) && (
+              {!activeProducts.some((p) => p.stock <= 3) && (
                 <div className="mini-empty">
                   Todos os produtos com estoque disponível.
                 </div>

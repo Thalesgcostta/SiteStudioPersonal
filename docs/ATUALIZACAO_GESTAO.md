@@ -2,6 +2,8 @@
 
 Esta versão acrescenta perfil da conta logada, fontes maiores, capacidade por horário, cobrança de bioimpedância, categorias e fotos de produtos, filtros financeiros e Dashboard individual.
 
+Depois desta atualização (003), siga também [a atualização de produtos e estoque](ATUALIZACAO_ESTOQUE.md) para aplicar 004 e habilitar exclusão e desenhos dos produtos. Para um projeto que já tem 003, execute somente 004.
+
 ## 1. Preparar o acesso administrativo
 
 No Supabase, abra **Authentication → Providers / Sign In** e confirme que **Allow new users to sign up está desabilitado**. Não há cadastro público de alunos: as contas são criadas pelo responsável em **Authentication → Users → Add user**.

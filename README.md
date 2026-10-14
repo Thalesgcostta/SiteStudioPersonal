@@ -4,7 +4,7 @@ Sistema administrativo em português do Brasil, com React, TypeScript, Vite e in
 
 ## Conectar o banco
 
-Para atualizar um site já em operação, siga [Atualizar o studio publicado](docs/ATUALIZACAO_GESTAO.md) e execute somente a migração 003. Ela preserva os registros e instala as novas funções de gestão. Todos os usuários cadastrados são administradores; mantenha o cadastro público de Authentication desabilitado.
+Para atualizar um site já em operação, siga [Atualizar produtos e estoque](docs/ATUALIZACAO_ESTOQUE.md): se a migração 003 já foi aplicada, execute somente 004. Caso tenha apenas 001 e 002, aplique [a atualização de gestão](docs/ATUALIZACAO_GESTAO.md) (003) antes de 004. Os registros existentes são preservados. Todos os usuários cadastrados são administradores; mantenha o cadastro público de Authentication desabilitado.
 
 Siga o [passo a passo do Supabase](docs/SUPABASE.md) para criar o projeto, executar as migrações, autorizar a administradora e configurar o acesso local e no Cloudflare Pages. O arquivo [.env.example](.env.example) lista as variáveis públicas do frontend.
 
@@ -40,7 +40,7 @@ Os testes cobrem SQL/RLS/transações em PostgreSQL local, fluxos da demonstraç
 3. **Agenda e horários:** grade semanal e consulta por dia/horário, com visão diária em celular, capacidade configurável e células que acomodam os alunos. Novos encaixes respeitam o limite; horários antigos acima do limite permanecem visíveis.
 4. **Bioimpedância:** pesquisa do aluno, registro, histórico, IMC, evolução, comparação, agendamento e recebimentos integrais/parciais conforme o preço configurado.
 5. **Mensalidades:** geração por competência, recebimentos totais e parciais, formas de pagamento e comprovantes. Em demo, o anexo registra apenas o nome; em Supabase, envia o arquivo para armazenamento privado.
-6. **Produtos:** cadastro, categorias configuráveis, fotos da galeria ou imagem padrão, catálogo, carrinho, desconto, aluno opcional, estoque e histórico de vendas.
+6. **Produtos:** cadastro, categorias configuráveis, fotos da galeria ou 12 desenhos à escolha, catálogo, carrinho, desconto, aluno opcional, controle de estoque com edição/exclusão e histórico de vendas preservado.
 7. **Financeiro:** mensalidades, produtos, bioimpedância, despesas e outras receitas; filtros por origem e período aplicados aos valores, gráficos, histórico e CSV.
 8. **Configurações:** studio, identidade visual, planos, capacidade, preço dos exames, categorias, perfil da conta, Dashboard individual e tamanho da exibição (100%, 110%, 125% ou 150%). As fontes da interface foram aumentadas; o ajuste de exibição permanece salvo neste navegador.
 

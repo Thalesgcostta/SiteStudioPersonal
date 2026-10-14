@@ -1,10 +1,11 @@
 import { CalendarDays, Check, CircleAlert, FileUp } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Empty, FormActions, Modal } from "./components";
 import { AddressFields } from "./AddressFields";
 import { StudentPicker } from "./StudentPicker";
 import { ProductImage } from "./ProductImage";
+import { ProductIllustration } from "./ProductIllustration";
 import { useStudio } from "./context";
 import type { ModalRequest } from "./context";
 import {
@@ -17,6 +18,7 @@ import {
   uid,
   evaluationBalance,
   weekdays,
+  productIllustrations,
 } from "./data";
 import type { Student, Product } from "./data";
 
@@ -1092,12 +1094,21 @@ function ProductForm({
           stock: 0,
           variant: "",
           color: "#579aba",
+          illustration: "category",
         },
   );
   const [error, setError] = useState("");
   const [photoFile, setPhotoFile] = useState<File | undefined>();
   const [photoLoading, setPhotoLoading] = useState(false);
   const [preview, setPreview] = useState("");
+  const photoInput = useRef<HTMLInputElement>(null);
+  const useIllustration = (illustration: Product["illustration"]) => {
+    if (photoInput.current) photoInput.current.value = "";
+    setPreview("");
+    setPhotoFile(undefined);
+    setError("");
+    setForm((f) => ({ ...f, illustration, photo: undefined, photoPath: null }));
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (saving || photoLoading) return;
@@ -1204,6 +1215,7 @@ function ProductForm({
               Escolher foto da galeria
               <input
                 aria-label="Foto do produto"
+                ref={photoInput}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 disabled={saving || photoLoading}
@@ -1242,16 +1254,48 @@ function ProductForm({
               type="button"
               className="text-button"
               disabled={saving || photoLoading}
-              onClick={() => {
-                setPreview("");
-                setPhotoFile(undefined);
-                setForm((f) => ({ ...f, photo: undefined, photoPath: null }));
-              }}
+              onClick={() => useIllustration("category")}
             >
               Usar imagem padrão da categoria
             </button>
             <p className="subtle-note">PNG, JPEG ou WebP de até 2 MB.</p>
           </div>
+          <fieldset className="illustration-picker">
+            <legend>Desenho padrão do produto</legend>
+            <p className="subtle-note">
+              Escolha um desenho para usar no lugar da foto. A cor definida
+              acima será aplicada à ilustração.
+            </p>
+            <div className="illustration-options">
+              {productIllustrations.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="illustration-option"
+                  aria-label={`Ilustração: ${item.label}`}
+                  aria-pressed={
+                    !preview &&
+                    !form.photo &&
+                    !form.photoPath &&
+                    form.illustration === item.id
+                  }
+                  disabled={
+                    saving ||
+                    photoLoading ||
+                    (mode === "supabase" && store.schemaVersion < 4)
+                  }
+                  onClick={() => useIllustration(item.id)}
+                >
+                  <ProductIllustration
+                    illustration={item.id}
+                    color={form.color}
+                    name={item.label}
+                  />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           {error && (
             <p className="form-error" role="alert">
               {error}

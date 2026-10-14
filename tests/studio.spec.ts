@@ -364,3 +364,71 @@ test("configurações persistem e restauração exige confirmação", async ({
     page.getByLabel("Telefone / WhatsApp", { exact: true }),
   ).toHaveValue("(16) 99999-0000");
 });
+
+test("controle de estoque e desenho persistem na demonstração, sem apagar vendas ao excluir", async ({
+  page,
+}) => {
+  await page
+    .getByRole("navigation", { name: "Menu principal" })
+    .getByRole("button", { name: "Vendas de produtos", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await page
+    .getByLabel("Quantidade em estoque de Whey Protein", { exact: true })
+    .fill("23");
+  await page
+    .getByRole("button", {
+      name: "Salvar estoque de Whey Protein",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('.toast[role="status"]')).toContainText(
+    "Estoque de Whey Protein atualizado",
+  );
+  await page
+    .getByRole("button", { name: "Editar Whey Protein", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Ilustração: Pré-treino", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Salvar produto", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Controle de estoque", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Quantidade em estoque de Whey Protein", { exact: true }),
+  ).toHaveValue("23");
+  const before = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("katielle-studio-demo-v1")!),
+  );
+  expect(before.products.find((p: any) => p.id === "p1").illustration).toBe(
+    "pre-workout",
+  );
+  await page
+    .getByRole("button", { name: "Excluir Whey Protein", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const after = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("katielle-studio-demo-v1")!),
+  );
+  expect(after.sales).toEqual(before.sales);
+  expect(after.products.find((p: any) => p.id === "p1").deletedAt).toBeTruthy();
+  await page
+    .getByRole("button", { name: "Catálogo e venda", exact: true })
+    .click();
+  await expect(
+    page.locator(".product-card").filter({ hasText: "Whey Protein" }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.locator(".product-card").filter({ hasText: "Whey Protein" }),
+  ).toHaveCount(0);
+});

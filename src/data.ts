@@ -110,7 +110,25 @@ export type Product = {
   version?: number;
   photoPath?: string | null;
   photo?: string;
+  illustration?: ProductIllustrationId;
+  deletedAt?: string | null;
 };
+export const productIllustrations = [
+  { id: "whey", label: "Whey protein" },
+  { id: "pre-workout", label: "Pré-treino" },
+  { id: "creatine", label: "Creatina" },
+  { id: "protein-bar", label: "Barra de proteína" },
+  { id: "shaker", label: "Coqueteleira" },
+  { id: "water-bottle", label: "Garrafa de água" },
+  { id: "resistance-band", label: "Elástico de resistência" },
+  { id: "dumbbell", label: "Halter" },
+  { id: "yoga-mat", label: "Tapete de treino" },
+  { id: "fitness-shirt", label: "Camiseta fitness" },
+  { id: "vitamins", label: "Vitaminas" },
+  { id: "peanut-butter", label: "Pasta de amendoim" },
+] as const;
+export type ProductIllustrationId =
+  "category" | (typeof productIllustrations)[number]["id"];
 export type Sale = {
   id: string;
   date: string;
@@ -188,12 +206,17 @@ export const evaluationBalance = (e: Evaluation) =>
 export function upgradeStore(store: Store): Store {
   return {
     ...store,
-    schemaVersion: store.schemaVersion ?? 3,
+    schemaVersion: store.schemaVersion ?? 4,
     settings: { ...settingsDefaults(), ...store.settings },
     evaluations: store.evaluations.map((e) => ({
       ...e,
       charge: e.charge ?? 0,
       payments: e.payments || [],
+    })),
+    products: store.products.map((p) => ({
+      ...p,
+      illustration: p.illustration ?? "category",
+      deletedAt: p.deletedAt ?? null,
     })),
   };
 }
@@ -312,6 +335,7 @@ export function seed(): Store {
     {
       id: "p1",
       name: "Whey Protein",
+      illustration: "whey",
       category: "Suplementos",
       price: 149.9,
       stock: 18,
@@ -321,6 +345,7 @@ export function seed(): Store {
     {
       id: "p2",
       name: "Creatina monohidratada",
+      illustration: "creatine",
       category: "Suplementos",
       price: 89.9,
       stock: 8,
@@ -330,6 +355,7 @@ export function seed(): Store {
     {
       id: "p3",
       name: "Barra de proteína",
+      illustration: "protein-bar",
       category: "Alimentos",
       price: 12.9,
       stock: 32,
@@ -339,6 +365,7 @@ export function seed(): Store {
     {
       id: "p4",
       name: "Coqueteleira",
+      illustration: "shaker",
       category: "Acessórios",
       price: 39.9,
       stock: 3,
@@ -348,6 +375,7 @@ export function seed(): Store {
     {
       id: "p5",
       name: "Mini band",
+      illustration: "resistance-band",
       category: "Acessórios",
       price: 29.9,
       stock: 12,
@@ -357,6 +385,7 @@ export function seed(): Store {
     {
       id: "p6",
       name: "Garrafa térmica",
+      illustration: "water-bottle",
       category: "Acessórios",
       price: 79.9,
       stock: 2,
@@ -452,7 +481,7 @@ export function seed(): Store {
   const next = d.toISOString().slice(0, 10);
   return {
     students,
-    schemaVersion: 3,
+    schemaVersion: 4,
     bills,
     evaluations,
     appointments: [

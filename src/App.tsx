@@ -162,7 +162,9 @@ export default function App() {
   const overdue = store.bills.filter(
     (b) => b.month === month && billStatus(b) === "Vencido",
   ).length;
-  const lowstock = store.products.filter((p) => p.stock <= 3).length;
+  const lowstock = store.products.filter(
+    (p) => !p.deletedAt && p.stock <= 3,
+  ).length;
   const style = {
     "--brand-orange": store.settings.orange,
     "--brand-blue": store.settings.blue,
@@ -446,10 +448,13 @@ export default function App() {
             "configuracoes",
           ].includes(section) &&
             section === "produtos" && (
-              <div className="context-month">
+              <section
+                className="context-month"
+                aria-label="Competência de consulta"
+              >
                 <span>Competência de consulta</span>
                 <MonthSelect />
-              </div>
+              </section>
             )}
           <main
             id="conteudo"
@@ -457,13 +462,15 @@ export default function App() {
             className="main-content"
             key={route}
           >
-            {mode === "supabase" && store.schemaVersion < 3 && (
+            {mode === "supabase" && store.schemaVersion < 4 && (
               <div className="storage-notice" role="status">
-                Atualização do banco pendente: execute
-                202610140003_studio_management.sql no SQL Editor do Supabase
-                para liberar as novas configurações, cobranças de exames e
-                fotos. Os registros e os fluxos existentes continuam
-                disponíveis.
+                Atualização do banco pendente: execute{" "}
+                {store.schemaVersion < 3
+                  ? "as migrações 003 e 004, nessa ordem,"
+                  : "a migração 202610140004_product_inventory.sql"}{" "}
+                no SQL Editor do Supabase para liberar todas as funções de
+                gestão, exclusão e desenhos de produtos. Os registros e os
+                fluxos existentes continuam disponíveis.
               </div>
             )}
             {storageError && (
@@ -485,7 +492,11 @@ export default function App() {
                     </button>
                   ))}
                 {store.products
-                  .filter((p) => normalize(p.name).includes(normalize(search)))
+                  .filter(
+                    (p) =>
+                      !p.deletedAt &&
+                      normalize(p.name).includes(normalize(search)),
+                  )
                   .map((p) => (
                     <button key={p.id} onClick={() => go("produtos")}>
                       <ShoppingBag size={16} />
@@ -496,8 +507,10 @@ export default function App() {
                 {!store.students.some((s) =>
                   normalize(s.name).includes(normalize(search)),
                 ) &&
-                  !store.products.some((p) =>
-                    normalize(p.name).includes(normalize(search)),
+                  !store.products.some(
+                    (p) =>
+                      !p.deletedAt &&
+                      normalize(p.name).includes(normalize(search)),
                   ) && <p>Nenhum aluno ou produto encontrado.</p>}
               </section>
             )}
