@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 export type PublicPlan = { days: number; monthlyPrice: number };
-const referencePlans: PublicPlan[] = [160, 220, 280, 360, 420].map(
-  (monthlyPrice, index) => ({ days: index + 1, monthlyPrice }),
+export const publicPlanDays = [2, 3, 4, 5] as const;
+const referencePlans: PublicPlan[] = [220, 280, 360, 420].map(
+  (monthlyPrice, index) => ({ days: publicPlanDays[index], monthlyPrice }),
 );
 export function usePublicPlans() {
   const [plans, setPlans] = useState<PublicPlan[] | null>(null);
@@ -51,10 +52,12 @@ export function usePublicPlans() {
         const data: unknown = await response.json();
         if (
           !Array.isArray(data) ||
-          data.length !== 5 ||
-          new Set(data.map((p) => p.days)).size !== 5 ||
+          data.length < 4 ||
+          data.length > 5 ||
           !data.every(
             (p) =>
+              p !== null &&
+              typeof p === "object" &&
               Number.isInteger(p.days) &&
               p.days >= 1 &&
               p.days <= 5 &&
@@ -63,8 +66,15 @@ export function usePublicPlans() {
           )
         )
           throw new Error();
+        // Aceita a função anterior com cinco planos durante a atualização do banco.
+        const publicPlans: PublicPlan[] = data.filter((p) => p.days >= 2);
+        if (
+          publicPlans.length !== publicPlanDays.length ||
+          new Set(publicPlans.map((p) => p.days)).size !== publicPlanDays.length
+        )
+          throw new Error();
         if (active) {
-          setPlans(data.sort((a, b) => a.days - b.days));
+          setPlans(publicPlans.sort((a, b) => a.days - b.days));
           setStatus("ready");
         }
       })

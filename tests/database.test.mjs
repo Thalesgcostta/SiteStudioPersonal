@@ -127,6 +127,14 @@ before(async () => {
     "utf8",
   );
   await db.exec(publicPlansSql);
+  const publicPlansTwoToFiveSql = await readFile(
+    new URL(
+      "../supabase/migrations/202610170006_public_plans_two_to_five.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  await db.exec(publicPlansTwoToFiveSql);
   legacyProductSnapshot = (
     await db.query(
       "select p.name,p.stock,p.photo_path,p.version,p.illustration,p.deleted_at,i.price,i.quantity,s.subtotal from public.products p join public.sale_items i on i.product_id=p.id join public.sales s on s.id=i.sale_id where p.id=$1",
@@ -144,6 +152,7 @@ before(async () => {
   await db.exec(management);
   await db.exec(inventory);
   await db.exec(publicPlansSql);
+  await db.exec(publicPlansTwoToFiveSql);
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -919,8 +928,8 @@ test("consulta pública expõe somente dias e preços, mantendo o administrativo
   ).rows[0].data;
   assert.deepEqual(
     plans,
-    [160, 220, 280, 360, 420].map((monthlyPrice, index) => ({
-      days: index + 1,
+    [220, 280, 360, 420].map((monthlyPrice, index) => ({
+      days: index + 2,
       monthlyPrice,
     })),
   );
@@ -954,7 +963,7 @@ test("preço público acompanha imediatamente os valores salvos no administrativ
   ).rows[0].data;
   assert.deepEqual(
     plans.map((p) => p.monthlyPrice),
-    planPrices,
+    planPrices.slice(1),
   );
   await role(outsider);
   assert.deepEqual(

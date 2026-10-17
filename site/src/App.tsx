@@ -18,7 +18,7 @@ import { Gallery } from "./Gallery";
 import { StudioVideo } from "./StudioVideo";
 import { photos, studio, whatsappLink } from "./content";
 import { BrandMark, StudioPhoto } from "./StudioPhoto";
-import { usePublicPlans } from "./usePublicPlans";
+import { publicPlanDays, usePublicPlans } from "./usePublicPlans";
 
 function TrialLink({
   className = "",
@@ -286,7 +286,7 @@ function Method() {
               number: "03",
               icon: ScanLine,
               title: "Cuidado que olha o todo.",
-              text: "Avaliações por bioimpedância para acompanhar seu caminho e parceria com o nutricionista Vinícius para apoiar o cuidado com a alimentação.",
+              text: "Avaliações por bioimpedância para acompanhar sua composição corporal e observar sua evolução ao longo dos treinos.",
             },
           ].map((item) => (
             <article className="method-feature" key={item.number}>
@@ -301,7 +301,7 @@ function Method() {
           <a
             className="method-contact text-link"
             href={whatsappLink(
-              "Olá, Katielle! Gostaria de saber mais sobre os treinos, a bioimpedância e a parceria com nutrição no studio.",
+              "Olá, Katielle! Gostaria de saber mais sobre os treinos e as avaliações por bioimpedância no studio.",
             )}
             target="_blank"
             rel="noopener noreferrer"
@@ -343,7 +343,7 @@ function Plans() {
           </p>
         </div>
         <div className="plan-grid" aria-busy={status === "loading"}>
-          {[1, 2, 3, 4, 5].map((days) => {
+          {publicPlanDays.map((days) => {
             const plan = plans?.find((p) => p.days === days);
             return (
               <article
@@ -366,12 +366,11 @@ function Plans() {
                 <p className="plan-description">
                   {
                     [
-                      "Seu primeiro compromisso.",
                       "Presença na rotina.",
                       "Constância em movimento.",
                       "Mais dias para você.",
                       "O cuidado na sua semana.",
-                    ][days - 1]
+                    ][days - 2]
                   }
                 </p>
                 <ul>
@@ -387,11 +386,11 @@ function Plans() {
                 <a
                   className="plan-contact"
                   href={whatsappLink(
-                    `Olá, Katielle! Conheci o studio pelo site e gostaria de saber mais sobre o plano de ${days} ${days === 1 ? "dia" : "dias"} por semana${plan ? `, por ${currency(plan.monthlyPrice)} ao mês` : ""}. Também quero agendar uma aula experimental gratuita.`,
+                    `Olá, Katielle! Conheci o studio pelo site e gostaria de saber mais sobre o plano de ${days} dias por semana${plan ? `, por ${currency(plan.monthlyPrice)} ao mês` : ""}. Também quero agendar uma aula experimental gratuita.`,
                   )}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={`Conversar sobre o plano de ${days} ${days === 1 ? "dia" : "dias"} por semana`}
+                  aria-label={`Conversar sobre o plano de ${days} dias por semana`}
                 >
                   Quero saber mais <ArrowUpRight size={18} />
                 </a>
@@ -444,8 +443,8 @@ function Questions() {
             text: "O treinamento é individualizado. Converse sobre seu momento, seus objetivos e seu condicionamento para encontrar um caminho que faça sentido para você.",
           },
           {
-            title: "Como agendar bioimpedância ou consultar a nutrição?",
-            text: "O studio realiza avaliações por bioimpedância e conta com a parceria do nutricionista Vinícius. Consulte agendamentos, condições e valores desses serviços pelo WhatsApp.",
+            title: "Como agendar uma avaliação por bioimpedância?",
+            text: "O studio realiza avaliações por bioimpedância para acompanhar sua composição corporal. Consulte horários, condições e valores pelo WhatsApp.",
           },
         ].map((item) => (
           <details key={item.title} name="studio-questions">
