@@ -16,6 +16,18 @@ export async function loadRemoteStore(): Promise<Store> {
 export async function applyRemoteAction(action: StudioAction): Promise<Store> {
   if (!supabase) throw new Error("Supabase não configurado.");
   if (
+    serverVersion < 7 &&
+    ([
+      "save_recurring_expense",
+      "pay_recurring_expense",
+      "set_registration_access",
+    ].includes(action.type) ||
+      (action.type === "save_student" && action.student.addressFields))
+  )
+    throw new Error(
+      "Execute a migração 202610170007_studio_registration_expenses.sql no Supabase para usar endereços separados, despesas fixas e cadastro por link.",
+    );
+  if (
     serverVersion < 4 &&
     (action.type === "delete_product" ||
       (action.type === "save_product" &&

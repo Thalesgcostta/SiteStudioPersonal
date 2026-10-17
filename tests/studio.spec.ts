@@ -105,13 +105,13 @@ test("cadastro valida dias do plano e cria perfil, agenda e cobrança", async ({
   const d = page.getByRole("dialog");
   await d.getByLabel("CEP", { exact: true }).fill("01001000");
   await d.getByRole("button", { name: "Buscar CEP", exact: true }).click();
-  await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Praça da Sé · Sé · São Paulo/SP · CEP 01001-000",
+  await expect(d.getByLabel("Rua / logradouro", { exact: true })).toHaveValue(
+    "Praça da Sé",
   );
+  await expect(d.getByLabel("Bairro", { exact: true })).toHaveValue("Sé");
   expect(cepRequests).toBe(1);
-  await d
-    .getByLabel("Endereço", { exact: true })
-    .fill("Praça da Sé, 42, sala 2 · Sé · São Paulo/SP · CEP 01001-000");
+  await d.getByLabel("Número da residência").fill("42");
+  await d.getByLabel("Complemento", { exact: true }).fill("sala 2");
   await d.getByLabel("Nome completo *").fill("Alice Demonstrativa");
   await d.getByLabel("Data de nascimento *").fill("1995-05-15");
   await d.getByLabel("CPF fictício *").fill("12345678901");
@@ -136,7 +136,7 @@ test("cadastro valida dias do plano e cria perfil, agenda e cobrança", async ({
   );
   await expect(page.locator(".profile-main")).toContainText("R$ 280,00");
   await expect(page.locator(".profile-card")).toContainText(
-    "Praça da Sé, 42, sala 2",
+    "Praça da Sé, 42 · sala 2",
   );
   await page.reload();
   await page
@@ -146,8 +146,9 @@ test("cadastro valida dias do plano e cria perfil, agenda e cobrança", async ({
   await d.getByLabel("CEP", { exact: true }).focus();
   await d.getByLabel("Nome completo *").focus();
   expect(cepRequests).toBe(1);
-  await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Praça da Sé, 42, sala 2 · Sé · São Paulo/SP · CEP 01001-000",
+  await expect(d.getByLabel("Número da residência")).toHaveValue("42");
+  await expect(d.getByLabel("Complemento", { exact: true })).toHaveValue(
+    "sala 2",
   );
   await d.getByRole("button", { name: "Cancelar", exact: true }).click();
   await page

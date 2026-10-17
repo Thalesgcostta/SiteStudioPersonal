@@ -4954,3 +4954,301 @@ td > div > small,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Cadastro estruturado, carrinho flutuante e rotina mensal. */
+.month-navigation {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.month-navigation .month-select {
+  min-width: 0;
+}
+.address-input-grid {
+  margin-top: 16px;
+}
+.products-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cart-launcher {
+  position: fixed;
+  bottom: 22px;
+  right: 24px;
+  z-index: 30;
+  box-shadow: 0 8px 30px #23313e33;
+  border-radius: 32px;
+}
+.floating-cart {
+  position: fixed;
+  bottom: 82px;
+  right: 24px;
+  z-index: 30;
+  width: min(390px, calc(100vw / var(--ui-scale, 1) - 28px));
+  max-height: calc(100dvh / var(--ui-scale, 1) - 115px);
+  overflow: auto;
+  border-radius: 14px;
+  box-shadow: 0 14px 55px #1f293b3d;
+  border: 1px solid #dce4eb;
+  background: white;
+}
+.floating-cart .cart-panel {
+  position: static;
+  margin: 0;
+  border: 0;
+}
+.cart-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recurring-totals {
+  padding: 18px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
+  border-bottom: 1px solid var(--border);
+}
+.recurring-totals > span {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #586879;
+}
+.recurring-totals strong {
+  font-size: 20px;
+  color: #29333f;
+}
+.recurring-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recurring-note {
+  display: flex;
+  gap: 9px;
+  align-items: start;
+  padding: 16px 24px;
+}
+.status-cadastro-pendente {
+  background: #fff2dc;
+  color: #895417;
+}
+.registration-link-panel {
+  margin-bottom: 22px;
+  border: 1px solid #dce5ed;
+  border-radius: 10px;
+  background: #fff;
+}
+.registration-link-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px 20px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.registration-link-panel > summary > span {
+  color: #935a14;
+  font-size: 13px;
+  margin-left: auto;
+}
+.registration-link-panel > div {
+  padding: 0 20px 20px;
+}
+.registration-link-panel p {
+  color: #586879;
+  line-height: 1.7;
+  font-size: 14px;
+}
+.registration-copy {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0;
+}
+.registration-copy input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dce5ed;
+  border-radius: 6px;
+}
+.registration-access-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 14px;
+}
+.registration-access-actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.registration-page {
+  background: #f8f7f3;
+  color: #29333f;
+}
+.registration-shell {
+  width: min(780px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 32px 0;
+}
+.registration-shell > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 10px 0 28px;
+}
+.registration-shell > header > span {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #5a6c79;
+}
+.registration-card {
+  border-radius: 18px;
+  padding: 42px;
+  background: #fff;
+  border: 1px solid #e1e5e7;
+  box-shadow: 0 10px 40px #27323d08;
+}
+.registration-card h1 {
+  font-size: clamp(28px, 5vw, 38px);
+  margin: 12px 0 18px;
+  letter-spacing: -1px;
+}
+.registration-intro {
+  color: #586879;
+  font-size: 15px;
+  line-height: 1.8;
+  margin-bottom: 25px;
+}
+.registration-card fieldset {
+  padding: 0;
+  border: 0;
+  margin: 28px 0;
+  min-width: 0;
+}
+.registration-card legend {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.registration-card .field {
+  font-size: 14px;
+  color: #425160;
+}
+.registration-card .field input,
+.registration-card .field select {
+  min-height: 45px;
+  font-size: 15px;
+}
+.registration-card .subtle-note {
+  color: #5b6a77;
+  line-height: 1.7;
+  margin: 14px 0;
+}
+.registration-card .weekday-picker {
+  flex-wrap: wrap;
+}
+.registration-consent {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 25px 0;
+}
+.registration-consent input {
+  flex: 0 0 auto;
+  margin-top: 5px;
+  accent-color: #24729a;
+}
+.registration-success {
+  text-align: center;
+  padding: 35px 0;
+}
+.registration-success svg {
+  color: #347652;
+}
+.registration-success p {
+  line-height: 1.8;
+  max-width: 500px;
+  margin: 15px auto;
+}
+.registration-shell > footer {
+  text-align: center;
+  font-size: 12px;
+  color: #5b6a77;
+  padding: 24px;
+  line-height: 1.8;
+}
+@media (max-width: 640px) {
+  .cart-launcher {
+    bottom: 14px;
+    right: 14px;
+  }
+  .floating-cart {
+    right: 14px;
+    bottom: 73px;
+    max-height: calc(80dvh / var(--ui-scale, 1));
+  }
+  .recurring-totals {
+    gap: 16px;
+    padding: 16px;
+  }
+  .registration-copy {
+    flex-wrap: wrap;
+  }
+  .registration-link-panel > summary {
+    flex-wrap: wrap;
+  }
+  .registration-link-panel > summary > span {
+    margin-left: 0;
+  }
+  .registration-shell {
+    width: min(100% - 24px, 780px);
+    padding-top: 16px;
+  }
+  .registration-shell > header {
+    flex-wrap: wrap;
+  }
+  .registration-card {
+    padding: 24px 18px;
+    border-radius: 12px;
+  }
+  .registration-card .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .registration-card .span-2 {
+    grid-column: 1 / -1;
+  }
+  .registration-card .weekday-picker {
+    gap: 8px;
+  }
+  .registration-card .weekday-picker button {
+    flex: 1 0 28%;
+  }
+}
+.recurring-panel td small {
+  color: #586879;
+}
+.empty h3 {
+  color: #586879;
+}
+.registration-page .brand strong {
+  color: #29333f;
+}
+.registration-page .brand span,
+.registration-page .eyebrow {
+  color: #326d89;
+}
+.recurring-panel {
+  margin-bottom: 22px;
+}
+.floating-cart .panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}

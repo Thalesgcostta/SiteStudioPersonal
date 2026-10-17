@@ -131,7 +131,7 @@ test("ampliação máxima mantém as oito áreas e o modal dentro da tela", asyn
   }
 });
 
-test("CEP inválido, inexistente e indisponível preservam o endereço manual", async ({
+test("CEP inválido, inexistente e indisponível preservam os campos manuais", async ({
   page,
 }) => {
   let calls = 0;
@@ -145,8 +145,9 @@ test("CEP inválido, inexistente e indisponível preservam o endereço manual", 
   });
   const dialog = await openStudent(page);
   await dialog
-    .getByLabel("Endereço", { exact: true })
-    .fill("Rua preenchida manualmente, 12");
+    .getByLabel("Rua / logradouro", { exact: true })
+    .fill("Rua preenchida manualmente");
+  await dialog.getByLabel("Número da residência").fill("12A");
   await dialog.getByLabel("CEP", { exact: true }).fill("123");
   await dialog.getByRole("button", { name: "Buscar CEP", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("8 dígitos");
@@ -154,23 +155,21 @@ test("CEP inválido, inexistente e indisponível preservam o endereço manual", 
   await dialog.getByLabel("CEP", { exact: true }).fill("00000000");
   await dialog.getByRole("button", { name: "Buscar CEP", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText("CEP não encontrado");
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Rua preenchida manualmente, 12",
-  );
   unavailable = true;
   await dialog.getByRole("button", { name: "Buscar CEP", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText(
     "preencha o endereço manualmente",
   );
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Rua preenchida manualmente, 12",
-  );
+  await expect(
+    dialog.getByLabel("Rua / logradouro", { exact: true }),
+  ).toHaveValue("Rua preenchida manualmente");
+  await expect(dialog.getByLabel("Número da residência")).toHaveValue("12A");
   await expect(
     dialog.getByRole("button", { name: "Cadastrar aluno", exact: true }),
   ).toBeEnabled();
 });
 
-test("resposta de CEP antigo não sobrescreve uma busca nova", async ({
+test("resposta de CEP antigo não sobrescreve busca nova nem número e complemento", async ({
   page,
 }) => {
   let first!: Route;
@@ -193,6 +192,10 @@ test("resposta de CEP antigo não sobrescreve uma busca nova", async ({
     }),
   );
   const dialog = await openStudent(page);
+  await dialog.getByLabel("Número da residência").fill("42");
+  await dialog
+    .getByLabel("Complemento", { exact: true })
+    .fill("Casa dos fundos");
   await dialog.getByLabel("CEP", { exact: true }).fill("01001000");
   await dialog.getByRole("button", { name: "Buscar CEP", exact: true }).click();
   await firstStarted;
@@ -201,9 +204,9 @@ test("resposta de CEP antigo não sobrescreve uma busca nova", async ({
   ).toBeDisabled();
   await dialog.getByLabel("CEP", { exact: true }).fill("14010000");
   await dialog.getByRole("button", { name: "Buscar CEP", exact: true }).click();
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Rua nova · Centro · Ribeirão Preto/SP · CEP 14010-000",
-  );
+  await expect(
+    dialog.getByLabel("Rua / logradouro", { exact: true }),
+  ).toHaveValue("Rua nova");
   await first.fulfill({
     json: {
       logradouro: "Rua antiga",
@@ -212,15 +215,22 @@ test("resposta de CEP antigo não sobrescreve uma busca nova", async ({
       uf: "SP",
     },
   });
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Rua nova · Centro · Ribeirão Preto/SP · CEP 14010-000",
+  await expect(
+    dialog.getByLabel("Rua / logradouro", { exact: true }),
+  ).toHaveValue("Rua nova");
+  await expect(dialog.getByLabel("Cidade", { exact: true })).toHaveValue(
+    "Ribeirão Preto",
+  );
+  await expect(dialog.getByLabel("Número da residência")).toHaveValue("42");
+  await expect(dialog.getByLabel("Complemento", { exact: true })).toHaveValue(
+    "Casa dos fundos",
   );
   await expect(
     dialog.getByRole("button", { name: "Cadastrar aluno", exact: true }),
   ).toBeEnabled();
 });
 
-test("CEP geral preenche cidade e estado e permite completar rua manualmente", async ({
+test("CEP geral completa cidade e estado e permite informar rua e bairro manualmente", async ({
   page,
 }) => {
   await page.route("https://viacep.com.br/ws/12345000/json/", (route) =>
@@ -235,16 +245,18 @@ test("CEP geral preenche cidade e estado e permite completar rua manualmente", a
   );
   const dialog = await openStudent(page);
   await dialog.getByLabel("CEP", { exact: true }).fill("12345000");
-  // Sair do campo já dispara a busca, sem precisar apertar o botão.
   await dialog.getByLabel("Nome completo *").focus();
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Cidade de teste/MG · CEP 12345-000",
+  await expect(dialog.getByLabel("Cidade", { exact: true })).toHaveValue(
+    "Cidade de teste",
   );
+  await expect(dialog.getByLabel("Estado", { exact: true })).toHaveValue("MG");
   await expect(dialog.getByRole("status")).toContainText("Complete rua");
   await dialog
-    .getByLabel("Endereço", { exact: true })
-    .fill("Rua manual, 1 · Cidade de teste/MG · CEP 12345-000");
-  await expect(dialog.getByLabel("Endereço", { exact: true })).toHaveValue(
-    "Rua manual, 1 · Cidade de teste/MG · CEP 12345-000",
+    .getByLabel("Rua / logradouro", { exact: true })
+    .fill("Rua manual");
+  await dialog.getByLabel("Número da residência").fill("S/N");
+  await dialog.getByLabel("Bairro", { exact: true }).fill("Bairro manual");
+  await expect(dialog.getByLabel("Cidade", { exact: true })).toHaveValue(
+    "Cidade de teste",
   );
 });

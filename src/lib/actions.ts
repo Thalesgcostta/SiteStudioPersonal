@@ -13,6 +13,7 @@ import type {
   EvaluationPayment,
   DashboardWidget,
   Movement,
+  RecurringExpense,
   Product,
   Receipt,
   Sale,
@@ -44,6 +45,15 @@ export type StudioAction =
   | { type: "record_sale"; sale: Sale }
   | { type: "record_movement"; movement: Movement }
   | { type: "delete_movement"; id: string }
+  | { type: "save_recurring_expense"; expense: RecurringExpense }
+  | {
+      type: "pay_recurring_expense";
+      id: string;
+      month: string;
+      date: string;
+      amount: number;
+    }
+  | { type: "set_registration_access"; enabled?: boolean; rotate?: boolean }
   | { type: "save_settings"; settings: Settings }
   | { type: "save_dashboard"; widgets: DashboardWidget[] }
   | { type: "reset_demo" };
@@ -85,7 +95,16 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
       return {
         ...s,
         students: existing
-          ? s.students.map((x) => (x.id === a.student.id ? a.student : x))
+          ? s.students.map((x) =>
+              x.id === a.student.id
+                ? {
+                    ...a.student,
+                    registrationPending: a.student.active
+                      ? false
+                      : a.student.registrationPending,
+                  }
+                : x,
+            )
           : [...s.students, a.student],
         bills: createBill
           ? [
@@ -292,6 +311,72 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
     }
     case "record_movement":
       return { ...s, movements: [...s.movements, a.movement] };
+    case "save_recurring_expense": {
+      const expenses = s.recurringExpenses || [];
+      const existing = expenses.find((item) => item.id === a.expense.id);
+      if (existing && existing.version !== a.expense.version)
+        throw new Error(
+          "A despesa foi alterada em outra sessão. Atualize antes de editar.",
+        );
+      if (
+        !Number.isFinite(a.expense.amount) ||
+        a.expense.amount <= 0 ||
+        a.expense.description.trim().length < 3 ||
+        a.expense.dueDay < 1 ||
+        a.expense.dueDay > 31 ||
+        (a.expense.endMonth && a.expense.endMonth < a.expense.startMonth)
+      )
+        throw new Error("Revise os dados da despesa fixa.");
+      const expense = { ...a.expense, version: (existing?.version || 0) + 1 };
+      return {
+        ...s,
+        recurringExpenses: existing
+          ? expenses.map((item) => (item.id === expense.id ? expense : item))
+          : [...expenses, expense],
+      };
+    }
+    case "pay_recurring_expense": {
+      const expense = s.recurringExpenses?.find((item) => item.id === a.id);
+      if (
+        !expense ||
+        a.month < expense.startMonth ||
+        (expense.endMonth && a.month > expense.endMonth)
+      )
+        throw new Error("Despesa fixa não prevista nesta competência.");
+      if (
+        s.movements.some(
+          (item) =>
+            item.recurringExpenseId === a.id && item.recurringMonth === a.month,
+        )
+      )
+        throw new Error("Esta despesa já foi paga nesta competência.");
+      if (!Number.isFinite(a.amount) || a.amount <= 0)
+        throw new Error("Informe um valor válido.");
+      return {
+        ...s,
+        movements: [
+          ...s.movements,
+          {
+            id: uid(),
+            date: a.date,
+            description: expense.description,
+            category: expense.category,
+            kind: "expense",
+            amount: a.amount,
+            recurringExpenseId: a.id,
+            recurringMonth: a.month,
+          },
+        ],
+      };
+    }
+    case "set_registration_access":
+      return {
+        ...s,
+        registrationAccess: {
+          token: a.rotate ? uid() : s.registrationAccess?.token || uid(),
+          enabled: a.enabled ?? s.registrationAccess?.enabled ?? true,
+        },
+      };
     case "delete_movement":
       return { ...s, movements: s.movements.filter((x) => x.id !== a.id) };
     case "save_settings":

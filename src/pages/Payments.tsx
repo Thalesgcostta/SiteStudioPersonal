@@ -36,6 +36,8 @@ import {
 } from "../data";
 import { finances } from "../metrics";
 import { downloadReceipt } from "../lib/repository";
+import { monthEnd, monthSeries } from "../calendar";
+import { RecurringExpenses } from "./RecurringExpenses";
 
 export function Payments() {
   const { store, execute, saving, mode, month, search, open, notify } =
@@ -278,12 +280,7 @@ export function Finance() {
   const [category, setCategory] = useState("todas");
   const [kind, setKind] = useState("todos");
   const [start, setStart] = useState(`${month}-01`);
-  const last = (m: string) => {
-    const d = new Date(`${m}-01T12:00:00`);
-    d.setMonth(d.getMonth() + 1);
-    d.setDate(0);
-    return d.toISOString().slice(0, 10);
-  };
+  const last = monthEnd;
   const [end, setEnd] = useState(last(month));
   useEffect(() => {
     setStart(`${month}-01`);
@@ -349,17 +346,13 @@ export function Finance() {
   const bioimpedance = transactions
     .filter((t) => t.category === "Bioimpedância")
     .reduce((sum, t) => sum + t.amount, 0);
-  const graphMonths: string[] = [];
-  if (start && end && start <= end) {
-    let cursor = start.slice(0, 7);
-    for (let i = 0; i < 120 && cursor <= end.slice(0, 7); i++) {
-      graphMonths.push(cursor);
-      const d = new Date(`${cursor}-15T12:00:00`);
-      d.setMonth(d.getMonth() + 1);
-      cursor = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    }
-  }
-  const graph = graphMonths.slice(-36).map((m) => {
+  const graphMonths =
+    start && end && start <= end
+      ? monthSeries(end.slice(0, 7), 36)
+          .reverse()
+          .filter((month) => month >= start.slice(0, 7))
+      : [];
+  const graph = graphMonths.map((m) => {
     const rows = transactions.filter((t) => t.date.startsWith(m));
     const income = rows
       .filter((t) => t.kind === "income")
@@ -484,6 +477,7 @@ export function Finance() {
           icon={<Clock3 size={18} />}
         />
       </div>
+      {source === "Tudo" && <RecurringExpenses />}
       <div className="finance-top">
         <Panel
           title="Evolução financeira"

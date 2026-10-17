@@ -9,12 +9,15 @@ export type ModalRequest = {
     | "evaluation"
     | "appointment"
     | "movement"
+    | "recurring_expense"
+    | "recurring_payment"
     | "product"
     | "evaluation_payment"
     | "confirm";
   studentId?: string;
   productId?: string;
   evaluationId?: string;
+  expenseId?: string;
   title?: string;
   message?: string;
   onConfirm?: () => void | Promise<void>;

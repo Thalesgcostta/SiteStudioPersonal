@@ -80,6 +80,12 @@ test.beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      "supabase/migrations/202610170007_studio_registration_expenses.sql",
+      "utf8",
+    ),
+  );
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -94,7 +100,7 @@ test.afterAll(async () => {
 });
 test.beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences cascade;update public.studio_settings set evaluation_price=0,max_per_slot=4;set role authenticated;",
+    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences,public.recurring_expenses,public.registration_submissions cascade;update public.registration_access set enabled=true;update public.studio_settings set evaluation_price=0,max_per_slot=4;set role authenticated;",
   );
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
     admin,
@@ -121,6 +127,30 @@ async function mock(
       route.fulfill({ status, headers, body: JSON.stringify(body) });
     if (request.method() === "OPTIONS")
       return route.fulfill({ status: 204, headers });
+    if (
+      url.pathname.endsWith("/get_public_registration_config") ||
+      url.pathname.endsWith("/submit_student_registration")
+    ) {
+      const body = request.postDataJSON();
+      await db.exec("reset role; set role anon");
+      try {
+        const data = url.pathname.endsWith("/get_public_registration_config")
+          ? await db.query<{ data: unknown }>(
+              "select public.get_public_registration_config($1::uuid) as data",
+              [body.p_token],
+            )
+          : await db.query<{ data: unknown }>(
+              "select public.submit_student_registration($1::uuid,$2::jsonb,$3::uuid) as data",
+              [body.p_token, JSON.stringify(body.p_student), body.p_request_id],
+            );
+        return respond(data.rows[0].data);
+      } catch (error) {
+        const failure = error as { message: string; code: string };
+        return respond({ message: failure.message, code: failure.code }, 400);
+      } finally {
+        await db.exec("reset role; set role authenticated");
+      }
+    }
     if (url.pathname === "/auth/v1/token") {
       const body = request.postDataJSON();
       if (body.password !== "SenhaDeTeste123!")
@@ -258,12 +288,10 @@ async function addStudent(page: Page, withCep = false) {
     );
     await d.getByLabel("CEP", { exact: true }).fill("01001000");
     await d.getByLabel("CEP", { exact: true }).press("Enter");
-    await expect(d.getByLabel("Endereço", { exact: true })).toHaveValue(
-      "Praça da Sé · Sé · São Paulo/SP · CEP 01001-000",
+    await expect(d.getByLabel("Rua / logradouro", { exact: true })).toHaveValue(
+      "Praça da Sé",
     );
-    await d
-      .getByLabel("Endereço", { exact: true })
-      .fill("Praça da Sé, 42 · Sé · São Paulo/SP · CEP 01001-000");
+    await d.getByLabel("Número da residência").fill("42");
   }
   await d.getByLabel("Nome completo *").fill("Alice do Banco");
   await d.getByLabel("Data de nascimento *").fill("1995-05-15");
@@ -1028,4 +1056,223 @@ test("banco com migração 003 mantém estoque acessível e bloqueia exclusão e
   await expect(
     page.getByRole("button", { name: "Ilustração: Pré-treino", exact: true }),
   ).toBeDisabled();
+});
+
+test("formulário público salva no banco sem login nem sessão administrativa e permite conferência", async ({
+  page,
+}) => {
+  const state = (await action("set_registration_access", {
+    enabled: true,
+  })) as any;
+  const access = state.registrationAccess.token;
+  await mock(page);
+  const privateRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/auth\/v1|get_studio_state|apply_studio_action/.test(request.url()))
+      privateRequests.push(request.url());
+  });
+  await page.addInitScript(() => {
+    if (location.pathname.includes("cadastro.html"))
+      localStorage.setItem(
+        "sb-127-auth-token",
+        JSON.stringify({ access_token: "sessao-privada-nao-usar" }),
+      );
+  });
+  await page.goto("/cadastro.html#" + access);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Vamos conhecer você.",
+  );
+  await page
+    .getByLabel("Nome completo *", { exact: true })
+    .fill("Aluno pelo link");
+  await page
+    .getByLabel("Data de nascimento *", { exact: true })
+    .fill("1996-05-12");
+  await page.getByLabel("CPF *", { exact: true }).fill("99887766554");
+  await page
+    .getByLabel("Telefone / WhatsApp *", { exact: true })
+    .fill("16999991234");
+  await page
+    .getByLabel("Rua / logradouro", { exact: true })
+    .fill("Rua dos Treinos");
+  await page.getByLabel("Número da residência").fill("27B");
+  await page.getByLabel("Bairro", { exact: true }).fill("Centro");
+  await page.getByLabel("Cidade", { exact: true }).fill("Franca");
+  await page.getByLabel("Estado", { exact: true }).selectOption("SP");
+  for (const day of ["Segunda", "Quarta", "Sexta"])
+    await page.getByRole("button", { name: day, exact: true }).click();
+  await page
+    .getByLabel("Autorizo o uso destas informações", { exact: false })
+    .check();
+  const failures = (
+    await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
+  ).violations;
+  expect(
+    failures.map((failure) => ({
+      id: failure.id,
+      nodes: failure.nodes.map((node) => ({
+        target: node.target,
+        summary: node.failureSummary,
+      })),
+    })),
+  ).toEqual([]);
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "/tmp/studio-registration-mobile.png",
+    fullPage: true,
+  });
+  const sent = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/submit_student_registration") &&
+      request.method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Enviar meu cadastro", exact: true })
+    .click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Cadastro enviado!",
+  );
+  expect((await sent).headers().authorization).toBeUndefined();
+  expect(privateRequests).toEqual([]);
+  await db.exec("reset role;set role authenticated");
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
+    admin,
+  ]);
+  let saved = (
+    await db.query<{ data: any }>("select public.get_studio_state() as data")
+  ).rows[0].data;
+  expect(saved.students).toHaveLength(1);
+  expect(saved.students[0].addressFields.number).toBe("27B");
+  expect(saved.students[0].registrationPending).toBe(true);
+  expect(saved.bills).toHaveLength(0);
+  await page.evaluate(() => localStorage.clear());
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await login(page);
+  await navigate(page, "Alunos");
+  await page.getByLabel("Filtrar status do aluno").selectOption("pendente");
+  await expect(page.locator("tbody")).toContainText("Cadastro pendente");
+  await page
+    .getByRole("button", { name: /Aluno pelo link/ })
+    .first()
+    .click();
+  await page
+    .getByRole("button", { name: "Ativar cadastro", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await expect(page.getByRole("status").last()).toContainText(
+    "Cadastro ativado",
+  );
+  saved = (
+    await db.query<{ data: any }>("select public.get_studio_state() as data")
+  ).rows[0].data;
+  expect(saved.students[0].active).toBe(true);
+  expect(saved.bills).toHaveLength(1);
+});
+
+test("despesas fixas editam a previsão e preservam o valor pago no financeiro real", async ({
+  page,
+}) => {
+  await mock(page);
+  await login(page);
+  await navigate(page, "Financeiro");
+  await page
+    .getByRole("button", { name: "Cadastrar despesa fixa", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Descrição *", { exact: true })
+    .fill("Funcionário do studio");
+  await dialog
+    .getByLabel("Categoria", { exact: true })
+    .selectOption("Funcionários");
+  await dialog.getByLabel("Valor mensal *").fill("2400");
+  await dialog
+    .getByRole("button", { name: "Salvar despesa fixa", exact: true })
+    .click();
+  const row = page
+    .locator(".recurring-panel tr")
+    .filter({ hasText: "Funcionário do studio" });
+  await expect(row).toContainText("A pagar");
+  await expect(
+    page.locator(".metric").filter({ hasText: "Despesas pagas" }),
+  ).toContainText("R$ 0,00");
+  await row
+    .getByRole("button", { name: "Registrar pagamento", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Confirmar pagamento", exact: true })
+    .click();
+  await expect(
+    page.locator(".metric").filter({ hasText: "Despesas pagas" }),
+  ).toContainText("R$ 2.400,00");
+  await row
+    .getByRole("button", {
+      name: "Editar despesa fixa Funcionário do studio",
+      exact: true,
+    })
+    .click();
+  await dialog.getByLabel("Valor mensal *").fill("2600");
+  await dialog
+    .getByRole("button", { name: "Salvar despesa fixa", exact: true })
+    .click();
+  await expect(row).toContainText("R$ 2.600,00");
+  await expect(row).toContainText("Pago: R$ 2.400,00");
+  await page.reload();
+  await expect(
+    page
+      .locator(".recurring-panel tr")
+      .filter({ hasText: "Funcionário do studio" }),
+  ).toContainText("Pago: R$ 2.400,00");
+});
+
+test("link de cadastro pode ser desativado e renovado pelo administrador", async ({
+  page,
+}) => {
+  await mock(page);
+  await login(page);
+  await navigate(page, "Alunos");
+  await page.getByText("Cadastro por link", { exact: true }).click();
+  const input = page.getByLabel("Link de cadastro dos alunos", { exact: true });
+  const original = await input.inputValue();
+  expect(original).toContain("/cadastro.html#");
+  await page
+    .getByLabel("Aceitar cadastros por este link", { exact: true })
+    .uncheck();
+  await expect(
+    page.getByLabel("Aceitar cadastros por este link", { exact: true }),
+  ).not.toBeChecked();
+  await page.goto(original);
+  await expect(page.getByRole("alert")).toContainText(
+    "Link de cadastro indisponível",
+  );
+  await expect(
+    page.getByRole("button", { name: "Enviar meu cadastro" }),
+  ).toHaveCount(0);
+  await page.goto("/#alunos");
+  await page.getByText("Cadastro por link", { exact: true }).click();
+  await page
+    .getByLabel("Aceitar cadastros por este link", { exact: true })
+    .check();
+  await expect(
+    page.getByLabel("Aceitar cadastros por este link", { exact: true }),
+  ).toBeChecked();
+  await page
+    .getByRole("button", { name: "Gerar novo link", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await expect(
+    page.getByLabel("Link de cadastro dos alunos", { exact: true }),
+  ).not.toHaveValue(original);
+  await page.goto(original);
+  await expect(page.getByRole("alert")).toContainText(
+    "Link de cadastro indisponível",
+  );
 });

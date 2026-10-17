@@ -3,7 +3,12 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Empty, FormActions, Modal } from "./components";
 import { AddressFields } from "./AddressFields";
+import { formatAddress, readAddress } from "./address";
 import { StudentPicker } from "./StudentPicker";
+import {
+  RecurringExpenseForm,
+  RecurringPaymentForm,
+} from "./pages/RecurringExpenses";
 import { ProductImage } from "./ProductImage";
 import { ProductIllustration } from "./ProductIllustration";
 import { useStudio } from "./context";
@@ -46,6 +51,10 @@ export function ModalHost({
     <AppointmentForm studentId={request.studentId} onClose={onClose} />
   ) : request.type === "movement" ? (
     <MovementForm onClose={onClose} />
+  ) : request.type === "recurring_expense" ? (
+    <RecurringExpenseForm expenseId={request.expenseId} onClose={onClose} />
+  ) : request.type === "recurring_payment" ? (
+    <RecurringPaymentForm expenseId={request.expenseId!} onClose={onClose} />
   ) : request.type === "product" ? (
     <ProductForm productId={request.productId} onClose={onClose} />
   ) : (
@@ -230,8 +239,14 @@ function StudentForm({
               />
             </label>
             <AddressFields
-              value={form.address}
-              onChange={(value) => update("address", value)}
+              value={readAddress(form)}
+              onChange={(value) =>
+                setForm((f) => ({
+                  ...f,
+                  addressFields: value,
+                  address: formatAddress(value),
+                }))
+              }
               onBusyChange={setAddressBusy}
               disabled={saving}
             />
@@ -1042,6 +1057,7 @@ function MovementForm({ onClose }: { onClose: () => void }) {
               {(kind === "expense"
                 ? [
                     "Aluguel",
+                    "Funcionários",
                     "Energia",
                     "Água",
                     "Manutenção",

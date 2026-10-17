@@ -34,13 +34,14 @@ import {
   currency,
   dateLabel,
   monthLabel,
-  months,
   normalize,
   paidAmount,
   today,
   weekdays,
 } from "../data";
 import { finances } from "../metrics";
+import { monthSeries } from "../calendar";
+import { RegistrationLink } from "../RegistrationLink";
 
 export function Dashboard() {
   const { store, month, go, open, user } = useStudio();
@@ -57,10 +58,12 @@ export function Dashboard() {
     status,
     count: f.bills.filter((b) => billStatus(b) === status).length,
   }));
-  const graph = [...months].reverse().map((m) => ({
-    label: monthLabel(m, true).split(" de ")[0],
-    ...finances(store, m),
-  }));
+  const graph = monthSeries(month)
+    .reverse()
+    .map((m) => ({
+      label: monthLabel(m, true),
+      ...finances(store, m),
+    }));
   const date = new Date(`${today}T12:00:00`).toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "numeric",
@@ -410,7 +413,12 @@ export function Students() {
   const list = store.students.filter(
     (s) =>
       normalize(s.name).includes(normalize(query || search)) &&
-      (status === "todos" || (status === "ativo" ? s.active : !s.active)) &&
+      (status === "todos" ||
+        (status === "pendente"
+          ? s.registrationPending
+          : status === "ativo"
+            ? s.active
+            : !s.active && !s.registrationPending)) &&
       (plan === "todos" || s.plan === Number(plan)) &&
       (payment === "todos" ||
         store.bills.some(
@@ -443,6 +451,7 @@ export function Students() {
           </>
         }
       />
+      <RegistrationLink />
       <div className="section-summary">
         <span>
           <Users size={17} />
@@ -472,6 +481,7 @@ export function Students() {
             <option value="todos">Todos os status</option>
             <option value="ativo">Ativos</option>
             <option value="inativo">Inativos</option>
+            <option value="pendente">Cadastros pendentes</option>
           </select>
           <select
             aria-label="Filtrar plano"
@@ -565,7 +575,15 @@ export function Students() {
                       <Status value={pay(s.id)} />
                     </td>
                     <td>
-                      <Status value={s.active ? "Ativo" : "Inativo"} />
+                      <Status
+                        value={
+                          s.registrationPending
+                            ? "Cadastro pendente"
+                            : s.active
+                              ? "Ativo"
+                              : "Inativo"
+                        }
+                      />
                     </td>
                     <td>
                       <button
@@ -591,7 +609,15 @@ export function Students() {
               >
                 <div className="student-card-top">
                   <Avatar name={s.name} size="large" />
-                  <Status value={s.active ? "Ativo" : "Inativo"} />
+                  <Status
+                    value={
+                      s.registrationPending
+                        ? "Cadastro pendente"
+                        : s.active
+                          ? "Ativo"
+                          : "Inativo"
+                    }
+                  />
                 </div>
                 <h3>{s.name}</h3>
                 <p>
@@ -673,7 +699,15 @@ export function StudentProfile({ id }: { id: string }) {
         <Panel className="profile-card">
           <Avatar name={s.name} size="profile" />
           <h2>{s.name}</h2>
-          <Status value={s.active ? "Ativo" : "Inativo"} />
+          <Status
+            value={
+              s.registrationPending
+                ? "Cadastro pendente"
+                : s.active
+                  ? "Ativo"
+                  : "Inativo"
+            }
+          />
           <dl>
             <dt>Telefone / WhatsApp</dt>
             <dd>{s.phone}</dd>
@@ -695,8 +729,14 @@ export function StudentProfile({ id }: { id: string }) {
             onClick={() =>
               open({
                 type: "confirm",
-                title: s.active ? "Inativar aluno?" : "Reativar aluno?",
-                message: `O histórico de ${s.name} será mantido. ${s.active ? "O aluno deixará de aparecer na agenda." : "O aluno voltará a aparecer na agenda."}`,
+                title: s.active
+                  ? "Inativar aluno?"
+                  : s.registrationPending
+                    ? "Ativar cadastro do aluno?"
+                    : "Reativar aluno?",
+                message: s.registrationPending
+                  ? `Após conferir o cadastro de ${s.name}, a ativação incluirá os horários na agenda e criará a mensalidade quando a data de início permitir, respeitando a disponibilidade.`
+                  : `O histórico de ${s.name} será mantido. ${s.active ? "O aluno deixará de aparecer na agenda." : "O aluno voltará a aparecer na agenda."}`,
                 onConfirm: async () => {
                   await execute({
                     type: "set_student_active",
@@ -706,13 +746,19 @@ export function StudentProfile({ id }: { id: string }) {
                   notify(
                     s.active
                       ? "Aluno inativado. Histórico preservado."
-                      : "Aluno reativado.",
+                      : s.registrationPending
+                        ? "Cadastro ativado."
+                        : "Aluno reativado.",
                   );
                 },
               })
             }
           >
-            {s.active ? "Inativar aluno" : "Reativar aluno"}
+            {s.active
+              ? "Inativar aluno"
+              : s.registrationPending
+                ? "Ativar cadastro"
+                : "Reativar aluno"}
           </button>
         </Panel>
         <div className="profile-main">

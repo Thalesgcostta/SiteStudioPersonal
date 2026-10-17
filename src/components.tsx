@@ -6,6 +6,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
   Clock3,
   Minus,
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 import { currency, initials, monthLabel, availableMonths } from "./data";
 import { useStudio } from "./context";
+import { shiftMonth } from "./calendar";
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
@@ -93,17 +96,39 @@ export function Empty({
 export function MonthSelect() {
   const { month, setMonth, store } = useStudio();
   return (
-    <label className="month-select">
-      <span className="sr-only">Competência mensal</span>
-      <select value={month} onChange={(e) => setMonth(e.target.value)}>
-        {availableMonths(store).map((m) => (
-          <option key={m} value={m}>
-            {monthLabel(m)}
-          </option>
-        ))}
-      </select>
-      <ChevronDown size={15} />
-    </label>
+    <div className="month-navigation">
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Competência anterior"
+        onClick={() => setMonth(shiftMonth(month, -1))}
+      >
+        <ChevronLeft size={17} />
+      </button>
+      <label className="month-select">
+        <span className="sr-only">Competência mensal</span>
+        <select
+          aria-label="Competência mensal"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+        >
+          {availableMonths(store, month).map((m) => (
+            <option key={m} value={m}>
+              {monthLabel(m)}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={15} />
+      </label>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label="Próxima competência"
+        onClick={() => setMonth(shiftMonth(month, 1))}
+      >
+        <ChevronRight size={17} />
+      </button>
+    </div>
   );
 }
 export function PageIntro({

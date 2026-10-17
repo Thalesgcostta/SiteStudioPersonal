@@ -1,14 +1,16 @@
+import type { Address } from "./address";
+import {
+  currentMonth,
+  months,
+  today,
+  monthSeries,
+  shiftMonth,
+} from "./calendar";
+export { currentMonth, months, today } from "./calendar";
 export const currency = (n: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     n,
   );
-export const today = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Sao_Paulo",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-}).format(new Date());
-export const currentMonth = today.slice(0, 7);
 export const dateLabel = (s: string) =>
   new Date(`${s}T12:00:00`).toLocaleDateString("pt-BR");
 export const monthLabel = (s: string, short = false) =>
@@ -16,11 +18,6 @@ export const monthLabel = (s: string, short = false) =>
     month: short ? "short" : "long",
     year: "numeric",
   });
-export const months = Array.from({ length: 6 }, (_, i) => {
-  const d = new Date(`${currentMonth}-15T12:00:00`);
-  d.setMonth(d.getMonth() - i);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-});
 export const weekdays = [
   "Segunda",
   "Terça",
@@ -44,6 +41,8 @@ export type Student = {
   phone: string;
   email: string;
   address: string;
+  addressFields?: Address | null;
+  registrationPending?: boolean;
   emergency: string;
   start: string;
   active: boolean;
@@ -144,7 +143,28 @@ export type Movement = {
   category: string;
   kind: "income" | "expense";
   amount: number;
+  recurringExpenseId?: string | null;
+  recurringMonth?: string | null;
 };
+export type RecurringExpense = {
+  id: string;
+  description: string;
+  category: string;
+  amount: number;
+  dueDay: number;
+  startMonth: string;
+  endMonth: string;
+  version?: number;
+};
+export const expenseCategories = [
+  "Aluguel",
+  "Funcionários",
+  "Energia",
+  "Água",
+  "Manutenção",
+  "Mercadorias",
+  "Outras despesas",
+];
 export type Settings = {
   name: string;
   professional: string;
@@ -218,6 +238,8 @@ export function upgradeStore(store: Store): Store {
       illustration: p.illustration ?? "category",
       deletedAt: p.deletedAt ?? null,
     })),
+    recurringExpenses: store.recurringExpenses || [],
+    registrationAccess: store.registrationAccess || null,
   };
 }
 export type Store = {
@@ -229,6 +251,8 @@ export type Store = {
   products: Product[];
   sales: Sale[];
   movements: Movement[];
+  recurringExpenses?: RecurringExpense[];
+  registrationAccess?: { token: string; enabled: boolean } | null;
   settings: Settings;
 };
 export const saleTotal = (s: Sale) =>
@@ -523,14 +547,16 @@ export const normalize = (s: string) =>
     .toLowerCase();
 export const uid = () => crypto.randomUUID();
 
-export function availableMonths(store: Store) {
-  const next = new Date(`${currentMonth}-15T12:00:00`);
-  next.setMonth(next.getMonth() + 1);
-  const upcoming = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+export function availableMonths(store: Store, selected = currentMonth) {
   return [
     ...new Set([
-      ...months,
-      upcoming,
+      ...monthSeries(currentMonth, 12),
+      ...Array.from({ length: 12 }, (_, i) => shiftMonth(currentMonth, i + 1)),
+      selected,
+      ...(store.recurringExpenses || []).flatMap((expense) => [
+        expense.startMonth,
+        ...(expense.endMonth ? [expense.endMonth] : []),
+      ]),
       ...store.bills.map((b) => b.month),
       ...store.sales.map((s) => s.date.slice(0, 7)),
       ...store.movements.map((m) => m.date.slice(0, 7)),

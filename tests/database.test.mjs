@@ -119,6 +119,14 @@ before(async () => {
     [legacySaleId, legacyProductId],
   );
   await db.exec(inventory);
+  const routine = await readFile(
+    new URL(
+      "../supabase/migrations/202610170007_studio_registration_expenses.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  await db.exec(routine);
   legacyProductSnapshot = (
     await db.query(
       "select p.name,p.stock,p.photo_path,p.version,p.illustration,p.deleted_at,i.price,i.quantity,s.subtotal from public.products p join public.sale_items i on i.product_id=p.id join public.sales s on s.id=i.sale_id where p.id=$1",
@@ -135,6 +143,7 @@ before(async () => {
   await db.exec(storage);
   await db.exec(management);
   await db.exec(inventory);
+  await db.exec(routine);
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -150,7 +159,7 @@ before(async () => {
 });
 beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences cascade;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 else 420 end;",
+    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences,public.recurring_expenses,public.registration_submissions cascade;update public.registration_access set enabled=true;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 else 420 end;",
   );
   await db.exec(
     "update public.studio_settings set evaluation_price=0,max_per_slot=4;",
@@ -498,7 +507,7 @@ test("usuário criado no Authentication recebe papel administrativo automaticame
   await db.exec("reset role");
   await db.query("insert into auth.users(id) values($1)", [id]);
   await role(id);
-  assert.equal((await state()).schemaVersion, 4);
+  assert.equal((await state()).schemaVersion, 7);
 });
 test("capacidade bloqueia novos encaixes e reativação, mas preserva horários antigos", async () => {
   const first = student();
@@ -901,4 +910,206 @@ test("migração de estoque preserva produtos, fotos e vendas de versões anteri
     quantity: 2,
     subtotal: "110.00",
   });
+});
+
+const registrationPayload = () => ({
+  name: "Cadastro pelo formulário",
+  birth: "1996-05-12",
+  cpf: "12345678901",
+  phone: "16999991234",
+  email: "",
+  emergency: "Contato: 16988881234",
+  addressFields: {
+    cep: "",
+    street: "Rua do Studio",
+    number: "123A",
+    complement: "Casa",
+    neighborhood: "Centro",
+    city: "Franca",
+    state: "SP",
+  },
+  plan: 3,
+  days: [0, 2, 4],
+  times: { 0: "07:00", 2: "07:00", 4: "07:00" },
+  consent: true,
+});
+async function registrationToken() {
+  await db.exec("reset role");
+  return (await db.query("select token from public.registration_access"))
+    .rows[0].token;
+}
+async function submitPublic(token, payload, requestId = randomUUID()) {
+  return (
+    await db.query(
+      "select public.submit_student_registration($1::uuid,$2::jsonb,$3::uuid) as data",
+      [token, JSON.stringify(payload), requestId],
+    )
+  ).rows[0].data;
+}
+test("endereço separado persiste e repetição antiga não desfaz edição mais recente", async () => {
+  const addressFields = registrationPayload().addressFields;
+  const first = { ...student(), address: "", addressFields };
+  const requestId = randomUUID();
+  await action("save_student", { student: first }, requestId);
+  let stored = (await state()).students[0];
+  assert.deepEqual(stored.addressFields, addressFields);
+  assert.match(stored.address, /Rua do Studio, 123A/);
+  await action("save_student", {
+    student: { ...stored, addressFields: { ...addressFields, number: "200" } },
+  });
+  await action("save_student", { student: first }, requestId);
+  assert.equal((await state()).students[0].addressFields.number, "200");
+});
+test("despesa fixa paga uma vez por competência, aceita funcionários e preserva pagamentos na edição", async () => {
+  const expense = {
+    id: randomUUID(),
+    description: "Pagamento de funcionário",
+    category: "Funcionários",
+    amount: 2500,
+    dueDay: 31,
+    startMonth: month,
+    endMonth: "",
+  };
+  let store = await action("save_recurring_expense", { expense });
+  assert.equal(store.recurringExpenses[0].version, 1);
+  const request = randomUUID();
+  const payment = { id: expense.id, month, date: today, amount: 2500 };
+  await action("pay_recurring_expense", payment, request);
+  await action("pay_recurring_expense", payment, request);
+  assert.equal((await state()).movements.length, 1);
+  await assert.rejects(
+    () => action("pay_recurring_expense", payment),
+    /já foi paga/,
+  );
+  store = await action("save_recurring_expense", {
+    expense: { ...store.recurringExpenses[0], amount: 2800 },
+  });
+  assert.equal(store.recurringExpenses[0].amount, 2800);
+  assert.equal(store.movements[0].amount, 2500);
+  assert.equal(store.movements[0].recurringMonth, month);
+  await assert.rejects(
+    () =>
+      action("save_recurring_expense", { expense: { ...expense, version: 1 } }),
+    /outra sessão/,
+  );
+  await assert.rejects(
+    () => action("pay_recurring_expense", { ...payment, month: "1999-01" }),
+    /não prevista/,
+  );
+});
+test("cadastro público salva aluno pendente sem cobrança, não expõe CPF existente e ativa pelas regras administrativas", async () => {
+  const token = await registrationToken();
+  await db.exec("set role anon");
+  const request = randomUUID();
+  const payload = registrationPayload();
+  assert.deepEqual(await submitPublic(token, payload, request), {
+    received: true,
+  });
+  await submitPublic(token, payload, request);
+  assert.deepEqual(
+    await submitPublic(token, { ...payload, name: "Outro nome" }),
+    { received: true },
+  );
+  await assert.rejects(
+    () => db.query("select * from public.students"),
+    /permission denied/,
+  );
+  await role();
+  let store = await state();
+  assert.equal(store.students.length, 1);
+  assert.equal(store.students[0].name, payload.name);
+  assert.equal(store.students[0].registrationPending, true);
+  assert.equal(store.students[0].active, false);
+  assert.equal(store.bills.length, 0);
+  assert.equal(store.students[0].addressFields.number, "123A");
+  store = await action("set_student_active", {
+    id: store.students[0].id,
+    active: true,
+  });
+  assert.equal(store.students[0].registrationPending, false);
+  assert.equal(store.bills.length, 1);
+  assert.equal(store.bills[0].amount, 280);
+});
+test("link inválido, desativado ou renovado e payloads que tentam ativar aluno são recusados", async () => {
+  const token = await registrationToken();
+  await db.exec("set role anon");
+  await assert.rejects(
+    () => submitPublic(randomUUID(), registrationPayload()),
+    /Link de cadastro indisponível/,
+  );
+  await assert.rejects(
+    () => submitPublic(token, { ...registrationPayload(), active: true }),
+    /Confira nome/,
+  );
+  await assert.rejects(
+    () => submitPublic(token, { ...registrationPayload(), consent: false }),
+    /Confira nome/,
+  );
+  await assert.rejects(
+    () => db.query("select public._get_studio_state_v4()"),
+    /permission denied/,
+  );
+  await assert.rejects(
+    () => db.query("select * from public.registration_access"),
+    /permission denied/,
+  );
+  await assert.rejects(
+    () => db.query("select * from public.recurring_expenses"),
+    /permission denied/,
+  );
+  await role();
+  await action("set_registration_access", { enabled: false });
+  await db.exec("reset role;set role anon");
+  await assert.rejects(
+    () => submitPublic(token, registrationPayload()),
+    /Link de cadastro indisponível/,
+  );
+  await role();
+  const store = await action("set_registration_access", {
+    enabled: true,
+    rotate: true,
+  });
+  assert.notEqual(store.registrationAccess.token, token);
+  await db.exec("reset role;set role anon");
+  await assert.rejects(
+    () => submitPublic(token, registrationPayload()),
+    /Link de cadastro indisponível/,
+  );
+  assert.deepEqual(
+    await submitPublic(store.registrationAccess.token, registrationPayload()),
+    { received: true },
+  );
+});
+test("cadastro público não ocupa vaga e ativação em horário lotado reverte sem gerar cobrança", async () => {
+  await createStudent();
+  await db.exec("reset role;update public.studio_settings set max_per_slot=1");
+  const token = await registrationToken();
+  await db.exec("set role anon");
+  await submitPublic(token, { ...registrationPayload(), cpf: "99887766554" });
+  await role();
+  const pending = (await state()).students.find(
+    (item) => item.registrationPending,
+  );
+  await assert.rejects(
+    () => action("set_student_active", { id: pending.id, active: true }),
+    /sem vagas/,
+  );
+  let store = await state();
+  assert.equal(store.bills.length, 1);
+  assert.equal(
+    store.students.find((item) => item.id === pending.id).active,
+    false,
+  );
+  store = await action("save_student", {
+    student: {
+      ...pending,
+      active: true,
+      times: { 0: "08:00", 2: "08:00", 4: "08:00" },
+    },
+  });
+  assert.equal(store.bills.length, 2);
+  assert.equal(
+    store.students.find((item) => item.id === pending.id).registrationPending,
+    false,
+  );
 });

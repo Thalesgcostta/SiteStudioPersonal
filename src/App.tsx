@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowRight,
@@ -27,6 +27,7 @@ import type { ModalRequest } from "./context";
 import { billStatus, normalize, currentMonth } from "./data";
 import { useStudioData } from "./lib/useStudioData";
 import { useDisplaySettings } from "./lib/useDisplaySettings";
+import { useCalendar } from "./lib/useCalendar";
 import { AuthGate } from "./AuthGate";
 import { ModalHost } from "./forms";
 import {
@@ -51,6 +52,9 @@ const nav = [
 ];
 const routeNow = () => window.location.hash.slice(1) || "dashboard";
 export default function App() {
+  const calendarDay = useCalendar();
+  const liveMonth = calendarDay.slice(0, 7);
+  const previousMonth = useRef(liveMonth);
   const data = useStudioData();
   const display = useDisplaySettings();
   const account = data.session?.user;
@@ -96,6 +100,11 @@ export default function App() {
     storageError,
   } = data;
   const [month, setMonth] = useState(currentMonth);
+  useEffect(() => {
+    const old = previousMonth.current;
+    previousMonth.current = liveMonth;
+    setMonth((selected) => (selected === old ? liveMonth : selected));
+  }, [liveMonth]);
   const [route, setRoute] = useState(routeNow);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<ModalRequest | null>(null);
@@ -473,6 +482,16 @@ export default function App() {
                 fluxos existentes continuam disponíveis.
               </div>
             )}
+            {mode === "supabase" &&
+              store.schemaVersion >= 4 &&
+              store.schemaVersion < 7 && (
+                <div className="storage-notice" role="status">
+                  Atualização disponível: execute a migração
+                  202610170007_studio_registration_expenses.sql no Supabase para
+                  salvar endereços separados, despesas fixas e cadastros por
+                  link.
+                </div>
+              )}
             {storageError && (
               <div className="storage-notice">
                 O navegador não permitiu salvar os dados. As alterações

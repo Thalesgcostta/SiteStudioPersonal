@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LoaderCircle, Search } from "lucide-react";
+import { states } from "./address";
+import type { Address } from "./address";
 class PostalLookupError extends Error {}
 
 const digitsOnly = (value: string) => value.replace(/\D/g, "").slice(0, 8);
@@ -15,15 +17,18 @@ export function AddressFields({
   onChange,
   onBusyChange,
   disabled,
+  required = false,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  value: Address;
+  onChange: (value: Address) => void;
   onBusyChange: (busy: boolean) => void;
   disabled: boolean;
+  required?: boolean;
 }) {
   const id = useId();
-  const storedCep = value.match(/\bCEP\s*(\d{5}-?\d{3})\b/i)?.[1] || "";
-  const [cep, setCep] = useState(storedCep);
+  const cep = value.cep;
+  const latest = useRef(value);
+  latest.current = value;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
@@ -32,7 +37,7 @@ export function AddressFields({
     null,
   );
   // Sair do CEP já salvo não deve substituir número/complemento existentes.
-  const lastSuccess = useRef(digitsOnly(storedCep));
+  const lastSuccess = useRef(digitsOnly(cep));
   useEffect(
     () => () => {
       sequence.current++;
@@ -113,16 +118,14 @@ export function AddressFields({
         typeof data.logradouro === "string" ? data.logradouro.trim() : "";
       const neighborhood =
         typeof data.bairro === "string" ? data.bairro.trim() : "";
-      onChange(
-        [
-          street,
-          neighborhood,
-          `${data.localidade}/${data.uf}`,
-          `CEP ${formatCep(digits)}`,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      );
+      onChange({
+        ...latest.current,
+        cep: formatCep(digits),
+        street,
+        neighborhood,
+        city: data.localidade.trim(),
+        state: data.uf,
+      });
       lastSuccess.current = digits;
       setMessage(
         street
@@ -165,7 +168,7 @@ export function AddressFields({
             aria-invalid={error || undefined}
             onChange={(e) => {
               cancel();
-              setCep(formatCep(e.target.value));
+              onChange({ ...value, cep: formatCep(e.target.value) });
             }}
             onBlur={() => void lookup()}
             onKeyDown={(e) => {
@@ -191,8 +194,8 @@ export function AddressFields({
         </button>
       </div>
       <p id={`${id}-help`} className="subtle-note cep-help">
-        Informe o CEP para preencher rua, bairro, cidade e estado. Número e
-        complemento devem ser informados por você.
+        O CEP é opcional. Busque o endereço ou preencha os campos manualmente.
+        Informe o número e o complemento, se houver.
       </p>
       {message && (
         <p
@@ -203,20 +206,56 @@ export function AddressFields({
           {message}
         </p>
       )}
-      <div className="field">
-        <label htmlFor={`${id}-address`}>Endereço</label>
-        <textarea
-          id={`${id}-address`}
-          rows={2}
-          autoComplete="street-address"
-          value={value}
-          disabled={disabled}
-          placeholder="Rua, número, complemento, bairro, cidade e estado"
-          onChange={(e) => {
-            cancel();
-            onChange(e.target.value);
-          }}
-        />
+      <div className="form-grid address-input-grid">
+        {(
+          [
+            ["street", "Rua / logradouro", "address-line1", 200],
+            ["number", "Número da residência", "off", 20],
+            ["complement", "Complemento", "address-line2", 100],
+            ["neighborhood", "Bairro", "address-level3", 100],
+            ["city", "Cidade", "address-level2", 100],
+          ] as const
+        ).map(([field, label, complete, max]) => (
+          <label
+            key={field}
+            className={`field ${field === "street" ? "span-2" : ""}`}
+          >
+            {label}
+            <input
+              value={value[field]}
+              autoComplete={complete}
+              maxLength={max}
+              required={required && field !== "complement"}
+              disabled={disabled}
+              placeholder={
+                field === "number" ? "Ex.: 123, 12A ou S/N" : undefined
+              }
+              onChange={(event) => {
+                if (field !== "number" && field !== "complement") cancel();
+                onChange({ ...value, [field]: event.target.value });
+              }}
+            />
+          </label>
+        ))}
+        <label className="field">
+          Estado
+          <select
+            aria-label="Estado"
+            value={value.state}
+            autoComplete="address-level1"
+            disabled={disabled}
+            required={required}
+            onChange={(event) => {
+              cancel();
+              onChange({ ...value, state: event.target.value });
+            }}
+          >
+            <option value="">Selecione</option>
+            {states.map((state) => (
+              <option key={state}>{state}</option>
+            ))}
+          </select>
+        </label>
       </div>
     </div>
   );
