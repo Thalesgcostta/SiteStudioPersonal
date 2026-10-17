@@ -257,6 +257,10 @@ test("falha de vídeo oferece acesso direto ao arquivo", async ({ page }) => {
 test("falha ou resposta inválida dos planos mantém preços sob consulta", async ({
   page,
 }) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning") warnings.push(message.text());
+  });
   await page.route(api, (route) =>
     respond(route, { message: "Indisponível" }, 503),
   );
@@ -266,6 +270,8 @@ test("falha ou resposta inválida dos planos mantém preços sob consulta", asyn
     { timeout: 10000 },
   );
   await expect(page.locator(".plan-price").first()).toHaveText("Consulte");
+  expect(warnings.some((message) => message.includes("HTTP 503"))).toBe(true);
+  expect(warnings.join(" ")).not.toContain("sb_publishable_local_test_only");
   await expect(page.locator(".plan-grid")).not.toContainText("R$ 160");
   await page.route(api, (route) =>
     respond(route, [{ days: 3, monthlyPrice: 999 }]),
