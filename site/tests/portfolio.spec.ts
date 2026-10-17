@@ -17,13 +17,6 @@ const respond = (route: Route, data: unknown, status = 200) =>
     : route.fulfill({ status, json: data, headers: cors });
 test.beforeEach(async ({ page }) => {
   await page.route(api, (route) => respond(route, rates));
-  // Fixtures verificam o comportamento das imagens e do carrossel; não substituem os arquivos do cliente.
-  await page.route("**/media/*.jpg", (route) =>
-    route.fulfill({
-      contentType: "image/svg+xml",
-      body: '<svg xmlns="http://www.w3.org/2000/svg" width="335" height="597"><rect width="335" height="597" fill="#353a42"/><circle cx="166" cy="185" r="65" fill="#ff6800"/><path d="M60 410h210" stroke="#579aba" stroke-width="24"/></svg>',
-    }),
-  );
 });
 
 test("portfolio mostra informações, preços do banco e contatos sem carregar o administrativo", async ({
@@ -84,17 +77,17 @@ test("carrossel filtra, navega e amplia fotos com teclado e fechamento por Escap
     .getByRole("navigation", { name: "Navegação do site" })
     .getByRole("link", { name: "Galeria", exact: true })
     .click();
-  await expect(page.locator(".gallery-slide")).toHaveCount(8);
+  await expect(page.locator(".gallery-slide")).toHaveCount(18);
   await page
     .getByRole("button", { name: "Próximas fotos", exact: true })
     .click();
-  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 8");
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 18");
   await page
     .getByRole("group", { name: "Filtrar fotos" })
     .getByRole("button", { name: "Estrutura", exact: true })
     .click();
-  await expect(page.locator(".gallery-slide")).toHaveCount(2);
-  await expect(page.locator(".gallery-bottom")).toContainText("Foto 1 de 2");
+  await expect(page.locator(".gallery-slide")).toHaveCount(3);
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 1 de 3");
   const button = page.getByRole("button", {
     name: "Ampliar foto: Nosso espaço em Franca",
     exact: true,
@@ -116,6 +109,112 @@ test("carrossel filtra, navega e amplia fotos com teclado e fechamento por Escap
   await expect(
     page.getByRole("button", { name: "Próximas fotos", exact: true }),
   ).toBeDisabled();
+});
+
+test("fotos reais carregam e a ampliação preserva a imagem inteira", async ({
+  page,
+}) => {
+  const failedMedia: string[] = [];
+  page.on("response", (response) => {
+    if (response.url().includes("/media/") && !response.ok())
+      failedMedia.push(response.url());
+  });
+  await page.goto("/");
+  await page.locator("img").evaluateAll((images) =>
+    images.forEach((image) => {
+      image.loading = "eager";
+    }),
+  );
+  await expect
+    .poll(() =>
+      page
+        .locator("img")
+        .evaluateAll((images) =>
+          images.every((image) => image.complete && image.naturalWidth > 0),
+        ),
+    )
+    .toBe(true);
+  await expect(page.locator(".photo-fallback")).toHaveCount(0);
+  const hero = await page
+    .locator(".hero-photo-primary img")
+    .evaluate((img: HTMLImageElement) => ({
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    }));
+  expect(hero).toEqual({ width: 720, height: 1280 });
+  await page
+    .getByRole("button", {
+      name: "Ampliar foto: Treino individualizado",
+      exact: true,
+    })
+    .click();
+  const photo = page.getByRole("dialog").locator("img");
+  await expect(photo).toHaveCSS("object-fit", "contain");
+  await expect
+    .poll(() =>
+      photo.evaluate(
+        (img: HTMLImageElement) => img.complete && img.naturalWidth === 335,
+      ),
+    )
+    .toBe(true);
+  expect(failedMedia).toEqual([]);
+});
+
+test("vídeo real só carrega após clique e reproduz em sua proporção original", async ({
+  page,
+}) => {
+  const videoRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("studio-em-movimento.mp4"))
+      videoRequests.push(request.url());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const player = page.locator("video");
+  await page.locator("#em-movimento").scrollIntoViewIfNeeded();
+  expect(await player.getAttribute("src")).toBeNull();
+  expect(await player.getAttribute("autoplay")).toBeNull();
+  expect(videoRequests).toEqual([]);
+  await page
+    .getByRole("button", { name: "Reproduzir vídeo do studio", exact: true })
+    .click();
+  await expect
+    .poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(0);
+  const playback = await player.evaluate((video: HTMLVideoElement) => {
+    video.pause();
+    return {
+      width: video.videoWidth,
+      height: video.videoHeight,
+      duration: video.duration,
+      controls: video.controls,
+      inline: video.playsInline,
+    };
+  });
+  expect(playback).toMatchObject({
+    width: 1024,
+    height: 576,
+    controls: true,
+    inline: true,
+  });
+  expect(playback.duration).toBeCloseTo(20, 0);
+  expect(videoRequests.length).toBeGreaterThan(0);
+  const frame = await page.locator(".video-frame").boundingBox();
+  expect(frame!.width / frame!.height).toBeCloseTo(16 / 9, 1);
+});
+
+test("falha de vídeo oferece acesso direto ao arquivo", async ({ page }) => {
+  await page.route("**/studio-em-movimento.mp4", (route) => route.abort());
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Reproduzir vídeo do studio", exact: true })
+    .click();
+  await expect(page.locator(".video-error")).toContainText(
+    "Não foi possível carregar o vídeo",
+  );
+  await expect(
+    page.getByRole("link", { name: "Abrir o vídeo diretamente" }),
+  ).toHaveAttribute("href", "/media/studio-em-movimento.mp4");
 });
 
 test("falha ou resposta inválida dos planos mantém preços sob consulta", async ({
@@ -150,6 +249,20 @@ test("desktop e celular preservam layout, contraste, menu e perguntas", async ({
   test.setTimeout(60000);
   await page.goto("/");
   await expect(page.locator(".plan-price").first()).toContainText("R$ 175");
+  await page.locator("img").evaluateAll((images) =>
+    images.forEach((image) => {
+      image.loading = "eager";
+    }),
+  );
+  await expect
+    .poll(() =>
+      page
+        .locator("img")
+        .evaluateAll((images) =>
+          images.every((image) => image.complete && image.naturalWidth > 0),
+        ),
+    )
+    .toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({
     path: "/tmp/studio-public-desktop.png",

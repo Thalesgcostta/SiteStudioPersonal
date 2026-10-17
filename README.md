@@ -4,7 +4,7 @@ Sistema administrativo em português do Brasil, com React, TypeScript, Vite e in
 
 ## Conectar o banco
 
-O novo [portfólio público](docs/PORTFOLIO_PUBLICO.md) fica em `site/`, com build e publicação separados. Inclui apresentação, galeria em carrossel, planos públicos e contato para aula experimental gratuita. A versão visual final aguarda os arquivos das fotos enviadas na conversa; `build:site` verifica a mídia antes de permitir publicar.
+O [portfólio público](docs/PORTFOLIO_PUBLICO.md) fica em `site/`, com build e publicação separados. Inclui as 21 imagens recebidas, galeria em carrossel, vídeo do studio com reprodução por clique, planos públicos e contato para aula experimental gratuita. `build:site` verifica os arquivos de mídia e gera `dist-site/` para publicação.
 
 Para atualizar um site já em operação, siga [Atualizar produtos e estoque](docs/ATUALIZACAO_ESTOQUE.md): se a migração 003 já foi aplicada, execute somente 004. Caso tenha apenas 001 e 002, aplique [a atualização de gestão](docs/ATUALIZACAO_GESTAO.md) (003) antes de 004. Os registros existentes são preservados. Todos os usuários cadastrados são administradores; mantenha o cadastro público de Authentication desabilitado.
 

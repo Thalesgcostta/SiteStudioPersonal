@@ -18,10 +18,10 @@ export type Photo = {
 export const photos = {
   logo: {
     id: "logo",
-    src: "/media/marca-kf.png",
+    src: "/media/marca-kf.webp",
     alt: "Marca KF Personal Trainer",
-    width: 690,
-    height: 276,
+    width: 680,
+    height: 272,
   },
   equipment: {
     id: "equipment",
@@ -107,23 +107,121 @@ export const photos = {
     width: 335,
     height: 597,
   },
+  barGuidance: {
+    id: "bar-guidance",
+    src: "/media/orientacao-na-barra.jpg",
+    alt: "Katielle orienta uma aluna durante um exercício com barra no banco do studio",
+    width: 720,
+    height: 1280,
+  },
+  benchSupport: {
+    id: "bench-support",
+    src: "/media/apoio-no-banco.jpg",
+    alt: "Katielle acompanha uma aluna deitada no banco durante um exercício com halteres",
+    width: 720,
+    height: 1280,
+  },
+  rowing: {
+    id: "rowing",
+    src: "/media/treino-de-remada.jpg",
+    alt: "Katielle demonstra a uma aluna o movimento de remada com apoio no banco",
+    width: 720,
+    height: 1280,
+  },
+  cableTraining: {
+    id: "cable-training",
+    src: "/media/treino-na-polia.jpg",
+    alt: "Katielle acompanha um aluno no aparelho de polia, sob a iluminação roxa do studio",
+    width: 720,
+    height: 1280,
+  },
+  shoulderTraining: {
+    id: "shoulder-training",
+    src: "/media/treino-de-ombros.jpg",
+    alt: "Katielle supervisiona um aluno no desenvolvimento de ombros com halteres",
+    width: 720,
+    height: 1280,
+  },
+  machineCare: {
+    id: "machine-care",
+    src: "/media/cuidado-no-aparelho.jpg",
+    alt: "Katielle orienta uma aluna sentada em um aparelho na área de treinamento",
+    width: 720,
+    height: 1280,
+  },
+  movementAdjustment: {
+    id: "movement-adjustment",
+    src: "/media/ajuste-de-movimento.jpg",
+    alt: "Katielle ajuda uma aluna a ajustar o movimento do braço com um halter",
+    width: 720,
+    height: 1280,
+  },
+  interior: {
+    id: "interior",
+    src: "/media/interior-studio.jpg",
+    alt: "Interior do studio com aparelhos de musculação e iluminação geométrica em roxo, azul e amarelo",
+    width: 720,
+    height: 1280,
+  },
 } satisfies Record<string, Photo>;
 
+export const studioVideo = {
+  src: "/media/studio-em-movimento.mp4",
+  poster: "/media/studio-video-capa.jpg",
+  width: 1024,
+  height: 576,
+};
+
 export const gallery = [
+  {
+    photo: photos.barGuidance,
+    title: "Orientação que faz a diferença",
+    category: "Treinos",
+  },
+  {
+    photo: photos.together,
+    title: "Movimento com um sorriso",
+    category: "Treinos",
+  },
+  {
+    photo: photos.interior,
+    title: "Por dentro do nosso studio",
+    category: "Estrutura",
+  },
+  {
+    photo: photos.cableTraining,
+    title: "Você no centro do treino",
+    category: "Treinos",
+  },
+  {
+    photo: photos.benchSupport,
+    title: "Apoio em cada etapa",
+    category: "Treinos",
+  },
   {
     photo: photos.technique,
     title: "Atenção em cada movimento",
     category: "Treinos",
   },
-  { photo: photos.care, title: "Acompanhamento de perto", category: "Treinos" },
   {
     photo: photos.exterior,
     title: "Nosso espaço em Franca",
     category: "Estrutura",
   },
+  { photo: photos.care, title: "Acompanhamento de perto", category: "Treinos" },
+  {
+    photo: photos.rowing,
+    title: "Aprender o movimento, sentir a evolução",
+    category: "Treinos",
+  },
   {
     photo: photos.student,
     title: "Seu tempo de cuidar de você",
+    category: "Treinos",
+  },
+  {
+    photo: photos.machineCare,
+    title: "Cuidado que acompanha você",
     category: "Treinos",
   },
   { photo: photos.movement, title: "Técnica na prática", category: "Treinos" },
@@ -135,6 +233,21 @@ export const gallery = [
   {
     photo: photos.personal,
     title: "Treino individualizado",
+    category: "Treinos",
+  },
+  {
+    photo: photos.shoulderTraining,
+    title: "Força com acompanhamento",
+    category: "Treinos",
+  },
+  {
+    photo: photos.movementAdjustment,
+    title: "Os detalhes de um treino bem feito",
+    category: "Treinos",
+  },
+  {
+    photo: photos.individual,
+    title: "Seu objetivo, nossa atenção",
     category: "Treinos",
   },
   {

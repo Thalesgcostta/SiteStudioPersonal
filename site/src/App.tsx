@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Gallery } from "./Gallery";
+import { StudioVideo } from "./StudioVideo";
 import { photos, studio, whatsappLink } from "./content";
 import { BrandMark, StudioPhoto } from "./StudioPhoto";
 import { usePublicPlans } from "./usePublicPlans";
@@ -138,13 +139,13 @@ function Hero() {
       </div>
       <div className="hero-visual">
         <div className="hero-photo-primary">
-          <StudioPhoto photo={photos.together} priority />
+          <StudioPhoto photo={photos.cableTraining} priority />
           <div className="hero-photo-label">
             <span className="status-dot" /> ACOMPANHAMENTO DE VERDADE
           </div>
         </div>
         <div className="hero-photo-secondary">
-          <StudioPhoto photo={photos.individual} />
+          <StudioPhoto photo={photos.benchSupport} />
         </div>
         <div className="hero-stamp" aria-hidden="true">
           <Sparkles size={22} />
@@ -539,6 +540,7 @@ export default function App() {
         <Hero />
         <About />
         <Method />
+        <StudioVideo />
         <Gallery />
         <Plans />
         <Questions />

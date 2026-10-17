@@ -5,7 +5,7 @@ const source = await readFile(
 );
 const assets = [
   ...new Set(
-    [...source.matchAll(/src:\s*"(\/media\/[^"\n]+)"/g)].map(
+    [...source.matchAll(/(?:src|poster):\s*"(\/media\/[^"\n]+)"/g)].map(
       (match) => match[1],
     ),
   ),
@@ -25,7 +25,7 @@ for (const path of assets) {
 }
 if (missing.length) {
   console.error(
-    "A publicação do portfólio aguarda as fotos originais em site/public/media:",
+    "Arquivos de mídia ausentes ou vazios em site/public/media:",
   );
   for (const path of missing) console.error(`- ${path}`);
   console.error(
