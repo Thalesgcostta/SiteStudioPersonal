@@ -24,6 +24,7 @@ import type {
 
 export type StudioAction =
   | { type: "save_student"; student: Student }
+  | { type: "delete_student"; id: string; expectedName: string }
   | { type: "set_student_active"; id: string; active: boolean }
   | { type: "generate_bills"; month: string }
   | { type: "record_payment"; billId: string; receipt: Receipt; file?: File }
@@ -119,6 +120,19 @@ export function applyDemoAction(s: Store, a: StudioAction): Store {
               },
             ]
           : s.bills,
+      };
+    }
+    case "delete_student": {
+      const student = s.students.find((x) => x.id === a.id);
+      if (!student || student.name !== a.expectedName)
+        throw new Error("O cadastro mudou. Atualize antes de excluir.");
+      return {
+        ...s,
+        students: s.students.filter((x) => x.id !== a.id),
+        bills: s.bills.filter((x) => x.studentId !== a.id),
+        evaluations: s.evaluations.filter((x) => x.studentId !== a.id),
+        appointments: s.appointments.filter((x) => x.studentId !== a.id),
+        sales: s.sales.filter((x) => x.studentId !== a.id),
       };
     }
     case "set_student_active": {

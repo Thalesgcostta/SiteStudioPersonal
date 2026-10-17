@@ -760,6 +760,21 @@ export function StudentProfile({ id }: { id: string }) {
                 ? "Ativar cadastro"
                 : "Reativar aluno"}
           </button>
+          <button
+            className="button danger-button full"
+            onClick={() => open({
+              type: "confirm",
+              title: "Excluir aluno definitivamente?",
+              message: `Excluir ${s.name}? O cadastro, os horários, as mensalidades e pagamentos, as bioimpedâncias e as vendas vinculadas serão apagados. Os totais financeiros serão recalculados. O estoque não será alterado. Esta ação não pode ser desfeita.`,
+              onConfirm: async () => {
+                await execute({ type: "delete_student", id, expectedName: s.name });
+                go("alunos");
+                notify("Aluno e histórico vinculado excluídos.");
+              },
+            })}
+          >
+            Excluir aluno
+          </button>
         </Panel>
         <div className="profile-main">
           <Panel title="Plano e rotina" subtitle="Atendimento individualizado">

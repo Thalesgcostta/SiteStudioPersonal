@@ -4,6 +4,8 @@ Sistema administrativo em português do Brasil, com React, TypeScript, Vite e in
 
 ## Conectar o banco
 
+A exclusão definitiva de alunos requer a [migração 008](supabase/migrations/202610170008_student_deletion.sql), aplicada após a 007. No perfil do aluno, **Excluir aluno** solicita confirmação e remove cadastro e histórico vinculado; o estoque não é alterado. Consulte [as instruções](docs/EXCLUSAO_ALUNOS.md).
+
 Para atualizar uma instalação já configurada até a migração 004, aplique a [atualização de cadastro e financeiro](docs/ATUALIZACAO_CADASTRO_FINANCEIRO.md) (007). Ela acrescenta endereços separados, despesas fixas e formulário de alunos por link, preservando os históricos. O build continua `npm run build` e também gera `cadastro.html`.
 
 Para atualizar um site já em operação, siga [Atualizar produtos e estoque](docs/ATUALIZACAO_ESTOQUE.md): se a migração 003 já foi aplicada, execute somente 004. Caso tenha apenas 001 e 002, aplique [a atualização de gestão](docs/ATUALIZACAO_GESTAO.md) (003) antes de 004. Os registros existentes são preservados. Todos os usuários cadastrados são administradores; mantenha o cadastro público de Authentication desabilitado.

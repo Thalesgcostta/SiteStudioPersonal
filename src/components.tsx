@@ -390,7 +390,7 @@ export function LineChart({
           >
             {i % Math.ceil(Math.max(1, data.length - 1) / 5) === 0 ||
             i === data.length - 1
-              ? d.label
+              ? d.label.split(" de ")[0]
               : ""}
           </text>
         ))}

@@ -15,6 +15,8 @@ export async function loadRemoteStore(): Promise<Store> {
 }
 export async function applyRemoteAction(action: StudioAction): Promise<Store> {
   if (!supabase) throw new Error("Supabase não configurado.");
+  if (serverVersion < 8 && action.type === "delete_student")
+    throw new Error("Execute a migração 202610170008_student_deletion.sql no Supabase para excluir alunos.");
   if (
     serverVersion < 7 &&
     ([

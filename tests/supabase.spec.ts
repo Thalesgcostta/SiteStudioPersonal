@@ -86,6 +86,7 @@ test.beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(await readFile("supabase/migrations/202610170008_student_deletion.sql", "utf8"));
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -1275,4 +1276,27 @@ test("link de cadastro pode ser desativado e renovado pelo administrador", async
   await expect(page.getByRole("alert")).toContainText(
     "Link de cadastro indisponível",
   );
+});
+
+test("excluir aluno exige confirmação e persiste a exclusão após recarregar", async ({ page }) => {
+  await mock(page);
+  await login(page);
+  await addStudent(page);
+  await navigate(page, "Alunos");
+  await page.getByRole("button", { name: "Ver perfil de Alice do Banco", exact: true }).click();
+  await page.getByRole("button", { name: "Excluir aluno", exact: true }).click();
+  const modal = page.getByRole("dialog");
+  await expect(modal).toContainText("Os totais financeiros serão recalculados");
+  await modal.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Alice do Banco", exact: true, level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Excluir aluno", exact: true }).click();
+  await modal.getByRole("button", { name: "Confirmar", exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Alunos", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ver perfil de Alice do Banco", exact: true })).toHaveCount(0);
+  expect((await db.query("select count(*)::int as n from public.students")).rows[0].n).toBe(0);
+  expect((await db.query("select count(*)::int as n from public.bills")).rows[0].n).toBe(0);
+  await page.reload();
+  await navigate(page, "Alunos");
+  await expect(page.getByRole("button", { name: "Ver perfil de Alice do Banco", exact: true })).toHaveCount(0);
 });

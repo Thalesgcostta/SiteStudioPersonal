@@ -144,6 +144,9 @@ before(async () => {
   await db.exec(management);
   await db.exec(inventory);
   await db.exec(routine);
+  const deletion = await readFile(new URL("../supabase/migrations/202610170008_student_deletion.sql", import.meta.url), "utf8");
+  await db.exec(deletion);
+  await db.exec(deletion);
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -507,7 +510,7 @@ test("usuário criado no Authentication recebe papel administrativo automaticame
   await db.exec("reset role");
   await db.query("insert into auth.users(id) values($1)", [id]);
   await role(id);
-  assert.equal((await state()).schemaVersion, 7);
+  assert.equal((await state()).schemaVersion, 8);
 });
 test("capacidade bloqueia novos encaixes e reativação, mas preserva horários antigos", async () => {
   const first = student();
@@ -1112,4 +1115,48 @@ test("cadastro público não ocupa vaga e ativação em horário lotado reverte 
     store.students.find((item) => item.id === pending.id).registrationPending,
     false,
   );
+});
+
+
+test("exclusão definitiva remove vínculos, preserva outros alunos e é idempotente", async () => {
+  const { s, bill } = await createStudent();
+  const other = { ...student(), id: randomUUID(), cpf: "98765432100", name: "Aluno preservado" };
+  await action("save_student", { student: other });
+  const evalId = randomUUID(), saleId = randomUUID(), productId = randomUUID();
+  await db.exec("reset role");
+  await db.query("insert into public.receipts(bill_id,amount,paid_on,method,created_by) values($1,10,$2,'Pix',$3)", [bill.id,today,admin]);
+  await db.query("insert into public.evaluations(id,student_id,evaluated_on,weight,height,fat,muscle,visceral,water,charge) values($1,$2,$3,70,1.7,20,30,8,55,50)",[evalId,s.id,today]);
+  await db.query("insert into public.evaluation_payments(id,evaluation_id,amount,paid_on,method,created_by) values($1,$2,50,$3,'Pix',$4)",[randomUUID(),evalId,today,admin]);
+  await db.query("insert into public.appointments(student_id,scheduled_on,scheduled_at) values($1,$2,'09:00')",[s.id,today]);
+  await db.query("insert into public.products(id,name,category,price,stock) values($1,'Produto teste','Suplementos',10,5)",[productId]);
+  await db.query("insert into public.sales(id,sold_on,student_id,discount,subtotal,method,created_by) values($1,$2,$3,0,10,'Pix',$4)",[saleId,today,s.id,admin]);
+  await db.query("insert into public.sale_items values($1,$2,1,10)",[saleId,productId]);
+  await role();
+  await assert.rejects(() => action("delete_student", {id:s.id,expectedName:"Nome errado"}), /cadastro mudou/);
+  const request = randomUUID(), payload = { id:s.id,expectedName:s.name };
+  const store = await action("delete_student",payload,request);
+  assert.equal(store.students.length,1);
+  assert.equal(store.students[0].id,other.id);
+  assert.equal(store.bills.length,1);
+  assert.equal(store.bills[0].studentId,other.id);
+  assert.equal(store.evaluations.length,0);
+  assert.equal(store.appointments.length,0);
+  assert.equal(store.sales.length,0);
+  assert.equal(store.products[0].stock,5);
+  assert.deepEqual((await action("delete_student",payload,request)).students,store.students);
+  await db.exec("reset role");
+  for (const table of ["receipts","evaluation_payments","sale_items"])
+    assert.equal((await db.query(`select count(*)::int as n from public.${table}`)).rows[0].n,0);
+  assert.equal((await db.query("select count(*)::int as n from public.student_schedule where student_id=$1",[s.id])).rows[0].n,0);
+});
+
+test("exclusão exige administrador e funções internas permanecem privadas", async () => {
+  const { s } = await createStudent();
+  await role(outsider);
+  await assert.rejects(() => action("delete_student",{id:s.id,expectedName:s.name}), /Acesso restrito/);
+  await assert.rejects(() => db.query("select public._apply_studio_action_v7('delete_student','{}',gen_random_uuid())"),/permission denied/);
+  await db.exec("reset role;set role anon");
+  await assert.rejects(() => action("delete_student",{id:s.id,expectedName:s.name}), /permission denied/);
+  await role();
+  assert.equal((await state()).students.length,1);
 });

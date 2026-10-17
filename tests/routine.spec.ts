@@ -142,3 +142,14 @@ test("despesa fixa reaparece em fevereiro e em ano bissexto sem entrar no caixa 
       .violations,
   ).toEqual([]);
 });
+
+test("eixo financeiro mostra só o mês e mantém ano nos detalhes", async ({ page }) => {
+  const chart = page.locator(".chart").first();
+  const labels = chart.locator("svg > text");
+  await expect(labels).toHaveCount(6);
+  for (const label of await labels.allTextContents()) {
+    expect(label).not.toMatch(/\d| de /);
+    expect(label.length).toBeLessThanOrEqual(5);
+  }
+  await expect(chart.locator("circle title").first()).toContainText(/20\d\d/);
+});
