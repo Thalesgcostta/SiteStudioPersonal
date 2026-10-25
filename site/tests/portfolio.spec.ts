@@ -468,7 +468,13 @@ test("planos retomam a cor clara anterior e mantêm zoom no hover", async ({
     .toBeGreaterThan(1.03);
   await expect(cards.nth(0)).toHaveCSS("transform", "none");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(cards.nth(1)).toHaveCSS("transform", "none");
+  await expect
+    .poll(() =>
+      cards
+        .nth(1)
+        .evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a),
+    )
+    .toBeGreaterThan(1.03);
 });
 
 test("carrossel avança a cada 2,5 segundos, pausa no hover e retorna ao início", async ({
@@ -510,9 +516,10 @@ test("carrossel avança a cada 2,5 segundos, pausa no hover e retorna ao início
     .toBeLessThan(2);
 });
 
-test("pausa explícita e preferência de movimento reduzido impedem avanço automático", async ({
+test("pausas manuais continuam funcionando no PC com movimento reduzido", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.clock.install();
   await page.goto("/");
   const track = page.locator(".gallery-track");
@@ -524,14 +531,8 @@ test("pausa explícita e preferência de movimento reduzido impedem avanço auto
   await page.mouse.move(0, 0);
   await page.clock.fastForward(6500);
   expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.reload();
-  await track.scrollIntoViewIfNeeded();
-  await page.mouse.move(0, 0);
-  await page.clock.fastForward(6500);
-  expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
   await expect(
-    page.getByRole("button", { name: "Ativar carrossel automático" }),
+    page.getByRole("button", { name: "Retomar carrossel automático" }),
   ).toBeEnabled();
   await page
     .getByRole("button", { name: "Próximas fotos", exact: true })
@@ -604,7 +605,7 @@ test("todas as seções, cabeçalho e rodapé mantêm fundo escuro", async ({
   ).toHaveCSS("background-color", "rgb(11, 16, 19)");
 });
 
-test("anéis giram continuamente e respeitam pausa e movimento reduzido", async ({
+test("anéis giram continuamente, respeitam pausa e iniciam mesmo com movimento reduzido", async ({
   page,
 }) => {
   await page.goto("/");
@@ -628,7 +629,7 @@ test("anéis giram continuamente e respeitam pausa e movimento reduzido", async 
     .click();
   await expect(first).toHaveCSS("animation-play-state", "running");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(first).toHaveCSS("animation-name", "none");
+  await expect(first).toHaveCSS("animation-name", "ring-orbit");
 });
 
 test("anéis permanecem centralizados em movimento normal e reduzido no PC e celular", async ({
@@ -672,19 +673,22 @@ test("anéis permanecem centralizados em movimento normal e reduzido no PC e cel
   }
 });
 
-test("PC com movimento reduzido permite ativar anéis e carrossel e guarda a escolha", async ({
+test("PC inicia anéis e carrossel automaticamente sem preferência salva nem clique em play", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.clock.install();
   await page.goto("/");
+  expect(
+    await page.evaluate(() => localStorage.getItem("kf-allow-motion")),
+  ).toBeNull();
   const ring = page.locator(".activity-ring").first();
-  await expect(ring).toHaveCSS("animation-name", "none");
-  await page.getByRole("button", { name: "Ativar animações do site" }).click();
   await expect(ring).toHaveCSS("animation-iteration-count", "infinite");
   await expect(ring).toHaveCSS("animation-play-state", "running");
+  await expect(
+    page.getByRole("button", { name: "Pausar movimento da abertura" }),
+  ).toBeVisible();
   await page.locator(".gallery-track").scrollIntoViewIfNeeded();
-  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
   await page.mouse.move(0, 0);
   await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
     "aria-live",
@@ -693,17 +697,14 @@ test("PC com movimento reduzido permite ativar anéis e carrossel e guarda a esc
   await page.clock.fastForward(2600);
   await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Pausar movimento da abertura" }),
-  ).toBeEnabled();
-  await expect(ring).toHaveCSS("animation-iteration-count", "infinite");
+  await expect(ring).toHaveCSS("animation-play-state", "running");
   await page
     .getByRole("button", { name: "Pausar movimento da abertura" })
     .click();
   await expect(ring).toHaveCSS("animation-play-state", "paused");
 });
 
-test("botão da galeria ativa movimento reduzido e cliques de mouse não prendem o autoplay", async ({
+test("retomar galeria no PC não prende o autoplay após clique de mouse", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -711,7 +712,10 @@ test("botão da galeria ativa movimento reduzido e cliques de mouse não prendem
   await page.goto("/");
   await page.locator(".gallery-track").scrollIntoViewIfNeeded();
   await page
-    .getByRole("button", { name: "Ativar carrossel automático" })
+    .getByRole("button", { name: "Pausar carrossel automático", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Retomar carrossel automático", exact: true })
     .click();
   // A mouse click may retain focus; only keyboard focus should suspend autoplay.
   await expect(page.locator(".gallery-bottom p")).toHaveAttribute(

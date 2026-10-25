@@ -20,7 +20,7 @@ const MotionPreference = createContext<{
   enableMotion: () => void;
 } | null>(null);
 
-/** Respect the system initially; a deliberate play action enables motion across the site. */
+/** Start motion automatically, including desktops reporting reduced motion. */
 export function MotionPreferenceProvider({
   children,
 }: {
@@ -29,9 +29,9 @@ export function MotionPreferenceProvider({
   const systemReduced = useSyncExternalStore(subscribe, snapshot, () => true);
   const [allowed, setAllowed] = useState(() => {
     try {
-      return localStorage.getItem(storageKey) === "true";
+      return localStorage.getItem(storageKey) !== "false";
     } catch {
-      return false;
+      return true;
     }
   });
   const reduced = systemReduced && !allowed;
