@@ -73,16 +73,20 @@ export function Hero({
             <button
               type="button"
               className="hero-motion-toggle"
-              disabled={motion.reduced}
               aria-pressed={paused || motion.reduced}
               onClick={() => {
-                setPaused(!paused);
+                if (motion.reduced) {
+                  motion.enableMotion();
+                  setPaused(false);
+                } else setPaused(!paused);
                 motion.reset();
               }}
               aria-label={
-                paused
-                  ? "Retomar movimento da abertura"
-                  : "Pausar movimento da abertura"
+                motion.reduced
+                  ? "Ativar animações do site"
+                  : paused
+                    ? "Retomar movimento da abertura"
+                    : "Pausar movimento da abertura"
               }
             >
               {paused || motion.reduced ? (
@@ -92,7 +96,7 @@ export function Hero({
               )}
               <span>
                 {motion.reduced
-                  ? "Movimento reduzido"
+                  ? "Ativar animações"
                   : paused
                     ? "Retomar movimento"
                     : "Pausar movimento"}

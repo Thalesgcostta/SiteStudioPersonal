@@ -531,8 +531,8 @@ test("pausa explícita e preferência de movimento reduzido impedem avanço auto
   await page.clock.fastForward(6500);
   expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
   await expect(
-    page.getByRole("button", { name: "Retomar carrossel automático" }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Ativar carrossel automático" }),
+  ).toBeEnabled();
   await page
     .getByRole("button", { name: "Próximas fotos", exact: true })
     .click();
@@ -629,4 +629,100 @@ test("anéis giram continuamente e respeitam pausa e movimento reduzido", async 
   await expect(first).toHaveCSS("animation-play-state", "running");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(first).toHaveCSS("animation-name", "none");
+});
+
+test("anéis permanecem centralizados em movimento normal e reduzido no PC e celular", async ({
+  page,
+}) => {
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion });
+    await page.goto("/");
+    for (const width of [1440, 1024, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const distances = await page
+        .locator(".activity-rings")
+        .evaluate((svg) => {
+          const center = (el: Element) => {
+            const rect = el.getBoundingClientRect();
+            return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+          };
+          const guide = center(svg.querySelector(".orbit-guide")!);
+          return [...svg.querySelectorAll(".ring-track")].map((el) => {
+            const ring = center(el);
+            return Math.hypot(ring.x - guide.x, ring.y - guide.y);
+          });
+        });
+      for (const distance of distances) expect(distance).toBeLessThan(1);
+      const alignment = await page
+        .locator(".activity-orbit")
+        .evaluate((orbit) => {
+          const svg = orbit
+            .querySelector(".activity-rings")!
+            .getBoundingClientRect();
+          const brand = orbit
+            .querySelector(".hero-brand")!
+            .getBoundingClientRect();
+          return Math.hypot(
+            svg.x + svg.width / 2 - brand.x - brand.width / 2,
+            svg.y + svg.height / 2 - brand.y - brand.height / 2,
+          );
+        });
+      expect(alignment).toBeLessThan(1);
+    }
+  }
+});
+
+test("PC com movimento reduzido permite ativar anéis e carrossel e guarda a escolha", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.clock.install();
+  await page.goto("/");
+  const ring = page.locator(".activity-ring").first();
+  await expect(ring).toHaveCSS("animation-name", "none");
+  await page.getByRole("button", { name: "Ativar animações do site" }).click();
+  await expect(ring).toHaveCSS("animation-iteration-count", "infinite");
+  await expect(ring).toHaveCSS("animation-play-state", "running");
+  await page.locator(".gallery-track").scrollIntoViewIfNeeded();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "off",
+  );
+  await page.clock.fastForward(2600);
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Pausar movimento da abertura" }),
+  ).toBeEnabled();
+  await expect(ring).toHaveCSS("animation-iteration-count", "infinite");
+  await page
+    .getByRole("button", { name: "Pausar movimento da abertura" })
+    .click();
+  await expect(ring).toHaveCSS("animation-play-state", "paused");
+});
+
+test("botão da galeria ativa movimento reduzido e cliques de mouse não prendem o autoplay", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.clock.install();
+  await page.goto("/");
+  await page.locator(".gallery-track").scrollIntoViewIfNeeded();
+  await page
+    .getByRole("button", { name: "Ativar carrossel automático" })
+    .click();
+  // A mouse click may retain focus; only keyboard focus should suspend autoplay.
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "off",
+  );
+  await page.clock.fastForward(2600);
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "polite",
+  );
 });

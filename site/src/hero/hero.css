@@ -132,12 +132,17 @@
   margin-top: -195px;
 }
 .activity-rings {
+  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 /* Rotate the rings independently; the KF remains steady and readable. */
 .activity-ring {
+  transform-box: view-box;
+  transform: rotate(-90deg);
   transform-origin: 200px 200px;
   animation: ring-orbit 18s linear infinite;
 }
@@ -674,9 +679,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero *,
-  .hero *::before,
-  .hero *::after {
+  :root:not([data-motion-preference="enabled"]) .hero *,
+  :root:not([data-motion-preference="enabled"]) .hero *::before,
+  :root:not([data-motion-preference="enabled"]) .hero *::after {
     animation: none !important;
     transition: none !important;
   }

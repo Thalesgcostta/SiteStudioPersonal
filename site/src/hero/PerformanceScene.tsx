@@ -58,7 +58,6 @@ export function PerformanceScene({ metrics, motion, paused }: Props) {
             <g
               className={`activity-ring activity-ring-${index}`}
               key={ring.radius}
-              transform="rotate(-90 200 200)"
             >
               <circle
                 className="ring-track"

@@ -19,6 +19,7 @@ export function Gallery() {
   const section = useRef<HTMLElement>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const keyboardInteraction = useRef(false);
   const [dragging, setDragging] = useState(false);
   const track = useRef<HTMLUListElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -84,17 +85,26 @@ export function Gallery() {
     <section
       id="galeria"
       ref={section}
-      onPointerEnter={(event) => {
-        if (event.pointerType === "mouse") setHovered(true);
-      }}
       onPointerLeave={() => {
         setHovered(false);
         setDragging(false);
       }}
-      onPointerDown={() => setDragging(true)}
+      onPointerDown={() => {
+        keyboardInteraction.current = false;
+        setFocused(false);
+        setDragging(true);
+      }}
+      onKeyDownCapture={() => {
+        keyboardInteraction.current = true;
+        setFocused(true);
+      }}
       onPointerUp={() => setDragging(false)}
       onPointerCancel={() => setDragging(false)}
-      onFocusCapture={() => setFocused(true)}
+      onFocusCapture={(event) =>
+        setFocused(
+          keyboardInteraction.current || event.target.matches(":focus-visible"),
+        )
+      }
       onBlurCapture={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget))
           setFocused(false);
@@ -138,18 +148,25 @@ export function Gallery() {
             type="button"
             className="round-button gallery-playback"
             aria-label={
-              playback.paused || playback.reduced
-                ? "Retomar carrossel automático"
-                : "Pausar carrossel automático"
+              playback.reduced
+                ? "Ativar carrossel automático"
+                : playback.paused
+                  ? "Retomar carrossel automático"
+                  : "Pausar carrossel automático"
             }
             aria-pressed={playback.paused || playback.reduced}
-            disabled={playback.reduced || items.length < 2}
+            disabled={items.length < 2}
             title={
               playback.reduced
-                ? "Movimento reduzido: use as setas para navegar"
+                ? "Ativar animações e reprodução automática neste site"
                 : "Troca automática a cada 2,5 segundos"
             }
-            onClick={() => playback.setPaused(!playback.paused)}
+            onClick={() => {
+              if (playback.reduced) {
+                playback.enableMotion();
+                playback.setPaused(false);
+              } else playback.setPaused(!playback.paused);
+            }}
           >
             {playback.paused || playback.reduced ? (
               <Play size={17} />
@@ -180,6 +197,10 @@ export function Gallery() {
       <ul
         className="gallery-track"
         ref={track}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") setHovered(true);
+        }}
+        onPointerLeave={() => setHovered(false)}
         onScroll={updatePosition}
         aria-label={`Fotos do studio: ${category}`}
         tabIndex={0}

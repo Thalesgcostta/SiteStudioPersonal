@@ -1,13 +1,9 @@
-import {
-  useMotionValue,
-  useSpring,
-  useTransform,
-  useReducedMotion,
-} from "framer-motion";
+import { useMotionValue, useSpring, useTransform } from "framer-motion";
+import { useMotionPreference } from "../MotionPreference";
 import type { PointerEvent } from "react";
 
 export function useHeroParallax() {
-  const reduced = useReducedMotion();
+  const { reduced, enableMotion } = useMotionPreference();
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
   const x = useSpring(pointerX, { stiffness: 85, damping: 24, mass: 0.6 });
@@ -25,5 +21,5 @@ export function useHeroParallax() {
     pointerX.set(((event.clientX - bounds.left) / bounds.width - 0.5) * 24);
     pointerY.set(((event.clientY - bounds.top) / bounds.height - 0.5) * 20);
   };
-  return { x, y, reverseX, reverseY, reduced: !!reduced, move, reset };
+  return { x, y, reverseX, reverseY, reduced, enableMotion, move, reset };
 }

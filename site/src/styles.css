@@ -972,8 +972,8 @@ h2 em {
   background: #e3e8dd;
 }
 @media (prefers-reduced-motion: reduce) {
-  .plan-card:hover,
-  .plan-card:focus-within {
+  :root:not([data-motion-preference="enabled"]) .plan-card:hover,
+  :root:not([data-motion-preference="enabled"]) .plan-card:focus-within {
     transform: none;
   }
 }
@@ -1792,20 +1792,24 @@ h2 em {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root {
+  :root:not([data-motion-preference="enabled"]) {
     scroll-behavior: auto;
   }
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion-preference="enabled"]) *,
+  :root:not([data-motion-preference="enabled"]) *::before,
+  :root:not([data-motion-preference="enabled"]) *::after {
     animation: none !important;
     transition: none !important;
   }
-  .cta:hover,
-  .gallery-photo-button:hover > .studio-photo,
-  .video-start:hover .video-play-icon,
-  .method-feature:hover,
-  .method-feature .feature-arrow {
+  :root:not([data-motion-preference="enabled"]) .cta:hover,
+  :root:not([data-motion-preference="enabled"])
+    .gallery-photo-button:hover
+    > .studio-photo,
+  :root:not([data-motion-preference="enabled"])
+    .video-start:hover
+    .video-play-icon,
+  :root:not([data-motion-preference="enabled"]) .method-feature:hover,
+  :root:not([data-motion-preference="enabled"]) .method-feature .feature-arrow {
     transform: none;
   }
 }
