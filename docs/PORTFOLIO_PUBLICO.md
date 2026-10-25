@@ -25,11 +25,15 @@ A atualização de outubro usa as **16 fotos de `FotosNovas.zip`**, preservadas 
 | Estrutura2.jpeg | estrutura-aparelhos.jpg | Galeria: aparelhos de musculação. |
 | Estrutura5.jpeg | halteres-do-studio.jpg | Galeria: pesos organizados. |
 
-A abertura destaca a marca KF em vetor, com animação de entrada e transição das fotografias. Não bloqueia o conteúdo nem depende de vídeos automáticos. As animações respeitam `prefers-reduced-motion`.
+A abertura usa uma composição escura com a KF em vetor e três anéis de atividade desenhados com **Framer Motion** (`LazyMotion` + `domAnimation`). Um pulso se expande durante a entrada e a marca se consolida no centro. Os painéis de VO₂ Máx, pace e batimentos, a foto de orientação e o halter em vetor compõem o ambiente. A paralaxe usa MotionValues e springs para atualizar transforms diretamente, sem renderizações React a cada movimento do mouse. O movimento da abertura tem controle de pausa e respeita `prefers-reduced-motion`; em telas de toque não há paralaxe pelo cursor.
+
+O código fica separado em `site/src/hero/`: `Hero.tsx` organiza a seção, `PerformanceScene.tsx` apresenta os elementos, `useHeroParallax.ts` controla o movimento e `metrics.ts` define o contrato `PerformanceSnapshot`. A prop `metrics` aceita novos snapshots de uma futura integração; o portfólio atual não consulta dados esportivos pessoais nem apresenta uma conexão em tempo real. O exemplo inicial (`42.1`, `05:02`, `142 bpm`) é identificado na tela como **métricas ilustrativas**. O vídeo continua sendo baixado somente após clique.
 
 Os três itens do método são botões: mouse, foco pelo teclado ou toque selecionam a foto correspondente. O texto permanece disponível em todos eles. Nenhuma foto é apresentada como sendo de um exame de bioimpedância; a imagem do terceiro item representa o ambiente de cuidado.
 
-O carrossel alterna retratos e panoramas, com cartões maiores para as fotos horizontais e ampliação da imagem inteira. Os filtros são Treinos, Estrutura e A personal. Todos os quatro planos compartilham as mesmas cores e botões, sem plano em destaque. A consulta dos preços ao Supabase permanece igual.
+O carrossel alterna retratos e panoramas, com cartões maiores para as fotos horizontais e ampliação da imagem inteira. Os filtros são Treinos, Estrutura e A personal. Todos os quatro planos compartilham o azul `#579aba`, o mesmo do F da marca, e ampliam suavemente no hover ou foco no botão, sem plano em destaque. O texto escuro mantém contraste sobre o azul. A ampliação é desativada quando há preferência por movimento reduzido. A consulta dos preços ao Supabase permanece igual.
+
+O carrossel avança automaticamente a cada **3 segundos** e retorna ao início ao chegar ao fim da área rolável. O visitante pode pausar e retomar pelo controle ao lado das setas. A reprodução fica suspensa fora da tela, em abas ocultas, durante hover, foco, gesto de toque ou ampliação de foto. Trocar de categoria reinicia o intervalo. Com `prefers-reduced-motion`, a navegação continua disponível pelas setas, filtros, teclado e gestos, sem avanço automático. Durante o avanço automático, o contador não gera anúncios repetidos para leitores de tela.
 
 ## Localização
 

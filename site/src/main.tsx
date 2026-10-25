@@ -8,6 +8,7 @@ import "@fontsource/inter/latin-600-italic.css";
 import "@fontsource/inter/latin-700.css";
 import App from "./App";
 import "./styles.css";
+import "./hero/hero.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

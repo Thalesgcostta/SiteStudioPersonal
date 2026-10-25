@@ -1,6 +1,14 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ArrowUpRight, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Pause,
+  Play,
+  X,
+} from "lucide-react";
 import { gallery } from "./content";
+import { useGalleryAutoplay } from "./useGalleryAutoplay";
 import { StudioPhoto } from "./StudioPhoto";
 
 export function Gallery() {
@@ -8,6 +16,10 @@ export function Gallery() {
   const [position, setPosition] = useState(0);
   const [canNext, setCanNext] = useState(true);
   const [view, setView] = useState<number | null>(null);
+  const section = useRef<HTMLElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const track = useRef<HTMLUListElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const captionId = useId();
@@ -55,6 +67,15 @@ export function Gallery() {
         : "smooth",
     });
   };
+  const playback = useGalleryAutoplay(
+    section,
+    () => {
+      if (!canNext) track.current?.scrollTo({ left: 0, behavior: "smooth" });
+      else move(1);
+    },
+    hovered || focused || dragging || view !== null || items.length < 2,
+    category,
+  );
   const moveLightbox = (direction: number) =>
     setView((index) =>
       index === null ? null : (index + direction + items.length) % items.length,
@@ -62,6 +83,22 @@ export function Gallery() {
   return (
     <section
       id="galeria"
+      ref={section}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse") setHovered(true);
+      }}
+      onPointerLeave={() => {
+        setHovered(false);
+        setDragging(false);
+      }}
+      onPointerDown={() => setDragging(true)}
+      onPointerUp={() => setDragging(false)}
+      onPointerCancel={() => setDragging(false)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget))
+          setFocused(false);
+      }}
       className="gallery-section"
       aria-labelledby="gallery-heading"
     >
@@ -97,6 +134,29 @@ export function Gallery() {
           ))}
         </div>
         <div className="gallery-controls">
+          <button
+            type="button"
+            className="round-button gallery-playback"
+            aria-label={
+              playback.paused || playback.reduced
+                ? "Retomar carrossel automático"
+                : "Pausar carrossel automático"
+            }
+            aria-pressed={playback.paused || playback.reduced}
+            disabled={playback.reduced || items.length < 2}
+            title={
+              playback.reduced
+                ? "Movimento reduzido: use as setas para navegar"
+                : "Troca automática a cada 3 segundos"
+            }
+            onClick={() => playback.setPaused(!playback.paused)}
+          >
+            {playback.paused || playback.reduced ? (
+              <Play size={17} />
+            ) : (
+              <Pause size={17} />
+            )}
+          </button>
           <button
             type="button"
             className="round-button"
@@ -165,7 +225,7 @@ export function Gallery() {
             }}
           />
         </div>
-        <p role="status" aria-live="polite">
+        <p role="status" aria-live={playback.running ? "off" : "polite"}>
           Foto {position + 1} de {items.length}
         </p>
       </div>

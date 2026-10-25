@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import {
-  ArrowDown,
   ArrowUpRight,
   Check,
   ChevronDown,
@@ -10,10 +9,10 @@ import {
   Menu,
   MessageCircle,
   ScanLine,
-  Sparkles,
   Target,
   X,
 } from "lucide-react";
+import { Hero } from "./hero/Hero";
 import { Gallery } from "./Gallery";
 import { StudioVideo } from "./StudioVideo";
 import { mapEmbedUrl, mapUrl, photos, studio, whatsappLink } from "./content";
@@ -99,89 +98,6 @@ function Header() {
         </nav>
       </div>
     </header>
-  );
-}
-function Hero() {
-  return (
-    <section
-      id="inicio"
-      className="hero container"
-      aria-labelledby="hero-heading"
-    >
-      <div className="hero-copy">
-        <span className="eyebrow">
-          <span className="status-dot" /> PERSONAL TRAINING · FRANCA, SP
-        </span>
-        <div
-          className="hero-brand"
-          role="img"
-          aria-label="KF — Katielle Faleiros Personal Trainer"
-        >
-          <BrandMark className="hero-brand-mark" />
-          <div className="hero-brand-name">
-            KATIELLE FALEIROS<span>PERSONAL TRAINER</span>
-          </div>
-        </div>
-        <h1 id="hero-heading">
-          Seu corpo. Seu ritmo.
-          <br />
-          <em>Seu melhor.</em>
-        </h1>
-        <p>
-          Um treino feito para você. Com atenção de perto, técnica em cada
-          movimento e espaço para cuidar da sua saúde.
-        </p>
-        <div className="hero-actions">
-          <TrialLink />
-          <a className="text-link" href="#studio">
-            Conheça o studio <ArrowDown size={17} />
-          </a>
-        </div>
-        <div className="trainer-intro">
-          <StudioPhoto photo={photos.katielle} />
-          <div>
-            <strong>Katielle Faleiros</strong>
-            <span>Mais de 15 anos cuidando de pessoas.</span>
-          </div>
-        </div>
-      </div>
-      <div className="hero-visual">
-        <div className="hero-photo-primary">
-          <StudioPhoto photo={photos.guidedTraining} priority />
-          <div className="hero-photo-label">
-            <span className="status-dot" /> ACOMPANHAMENTO DE VERDADE
-          </div>
-        </div>
-        <div className="hero-photo-secondary">
-          <StudioPhoto photo={photos.interior} />
-          <span>Seu espaço para evoluir.</span>
-        </div>
-        <div className="hero-stamp" aria-hidden="true">
-          <Sparkles size={22} />
-          <span>
-            SEU TREINO.
-            <br />
-            SEU MOMENTO.
-          </span>
-        </div>
-        <div className="hero-note">
-          <span>01 /</span>
-          <p>
-            Você no centro.
-            <br />
-            <strong>Em cada movimento.</strong>
-          </p>
-          <ArrowUpRight size={28} />
-        </div>
-      </div>
-      <div className="hero-bottom">
-        <span>MENOS DISTRAÇÕES. MAIS CUIDADO.</span>
-        <a href="#metodo" aria-label="Descubra nosso cuidado">
-          <ArrowDown size={21} />
-        </a>
-        <span>SAÚDE · FORÇA · QUALIDADE DE VIDA</span>
-      </div>
-    </section>
   );
 }
 function About() {

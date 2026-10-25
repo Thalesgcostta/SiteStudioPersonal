@@ -316,13 +316,7 @@ test("desktop e celular preservam layout, contraste, menu e perguntas", async ({
         ),
     )
     .toBe(true);
-  await page.locator(".hero").evaluate(async (hero) => {
-    await Promise.all(
-      hero
-        .getAnimations({ subtree: true })
-        .map((animation) => animation.finished.catch(() => {})),
-    );
-  });
+  await expect(page.locator(".hero-brand")).toHaveCSS("opacity", "1");
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({
     path: "/tmp/studio-public-desktop.png",
@@ -455,4 +449,127 @@ test("contato incorpora mapa real com endereço completo e link externo correspo
     (await page.locator('script[type="application/ld+json"]').textContent())!,
   );
   expect(structured.address.postalCode).toBe("14407-061");
+});
+
+test("planos usam o azul da marca e ampliam no hover sem destacar um plano", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const cards = page.locator(".plan-card");
+  for (const card of await cards.all())
+    await expect(card).toHaveCSS("background-color", "rgb(87, 154, 186)");
+  await cards.nth(1).hover();
+  await expect
+    .poll(() =>
+      cards
+        .nth(1)
+        .evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).a),
+    )
+    .toBeGreaterThan(1.03);
+  await expect(cards.nth(0)).toHaveCSS("transform", "none");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(cards.nth(1)).toHaveCSS("transform", "none");
+});
+
+test("carrossel avança a cada 3 segundos, pausa no hover e retorna ao início", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto("/");
+  const track = page.locator(".gallery-track");
+  await track.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "off",
+  );
+  await page.clock.fastForward(3100);
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
+  await track.hover();
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "polite",
+  );
+  const position = await track.evaluate((el) => el.scrollLeft);
+  await page.clock.fastForward(6500);
+  expect(await track.evaluate((el) => el.scrollLeft)).toBeCloseTo(position, 0);
+  await track.evaluate((el) =>
+    el.scrollTo({ left: el.scrollWidth, behavior: "instant" }),
+  );
+  await expect(
+    page.getByRole("button", { name: "Próximas fotos", exact: true }),
+  ).toBeDisabled();
+  await page.mouse.move(0, 0);
+  await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
+    "aria-live",
+    "off",
+  );
+  await page.clock.fastForward(3100);
+  await expect
+    .poll(() => track.evaluate((el) => el.scrollLeft))
+    .toBeLessThan(2);
+});
+
+test("pausa explícita e preferência de movimento reduzido impedem avanço automático", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto("/");
+  const track = page.locator(".gallery-track");
+  await track.scrollIntoViewIfNeeded();
+  await page
+    .getByRole("button", { name: "Pausar carrossel automático", exact: true })
+    .click();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.mouse.move(0, 0);
+  await page.clock.fastForward(6500);
+  expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await track.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await page.clock.fastForward(6500);
+  expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
+  await expect(
+    page.getByRole("button", { name: "Retomar carrossel automático" }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Próximas fotos", exact: true })
+    .click();
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
+});
+
+test("hero tem anéis, métricas ilustrativas e paralaxe com pausa", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.locator(".ring-progress")).toHaveCount(3);
+  await expect(page.locator(".scene-disclaimer")).toContainText(
+    "Métricas ilustrativas",
+  );
+  await expect(page.locator(".metric-vo2")).toContainText("42.1");
+  await expect(page.locator(".metric-pace")).toContainText("05:02");
+  const card = page.locator(".metric-vo2");
+  await page.mouse.move(1300, 200);
+  await expect
+    .poll(() =>
+      card.evaluate((el) =>
+        Math.abs(new DOMMatrix(getComputedStyle(el).transform).e),
+      ),
+    )
+    .toBeGreaterThan(1);
+  await page
+    .getByRole("button", { name: "Pausar movimento da abertura" })
+    .click();
+  await expect
+    .poll(() =>
+      card.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e),
+    )
+    .toBe(0);
+  await page.mouse.move(1200, 400);
+  await expect
+    .poll(() =>
+      card.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e),
+    )
+    .toBe(0);
 });
