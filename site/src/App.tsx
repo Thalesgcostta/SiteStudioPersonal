@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Gallery } from "./Gallery";
 import { StudioVideo } from "./StudioVideo";
-import { photos, studio, whatsappLink } from "./content";
+import { mapEmbedUrl, mapUrl, photos, studio, whatsappLink } from "./content";
 import { BrandMark, StudioPhoto } from "./StudioPhoto";
 import { publicPlanDays, usePublicPlans } from "./usePublicPlans";
 
@@ -112,10 +112,18 @@ function Hero() {
         <span className="eyebrow">
           <span className="status-dot" /> PERSONAL TRAINING · FRANCA, SP
         </span>
+        <div
+          className="hero-brand"
+          role="img"
+          aria-label="KF — Katielle Faleiros Personal Trainer"
+        >
+          <BrandMark className="hero-brand-mark" />
+          <div className="hero-brand-name">
+            KATIELLE FALEIROS<span>PERSONAL TRAINER</span>
+          </div>
+        </div>
         <h1 id="hero-heading">
-          Seu corpo.
-          <br />
-          Seu ritmo.
+          Seu corpo. Seu ritmo.
           <br />
           <em>Seu melhor.</em>
         </h1>
@@ -130,7 +138,7 @@ function Hero() {
           </a>
         </div>
         <div className="trainer-intro">
-          <StudioPhoto photo={photos.portrait} priority />
+          <StudioPhoto photo={photos.katielle} />
           <div>
             <strong>Katielle Faleiros</strong>
             <span>Mais de 15 anos cuidando de pessoas.</span>
@@ -139,13 +147,14 @@ function Hero() {
       </div>
       <div className="hero-visual">
         <div className="hero-photo-primary">
-          <StudioPhoto photo={photos.cableTraining} priority />
+          <StudioPhoto photo={photos.guidedTraining} priority />
           <div className="hero-photo-label">
             <span className="status-dot" /> ACOMPANHAMENTO DE VERDADE
           </div>
         </div>
         <div className="hero-photo-secondary">
-          <StudioPhoto photo={photos.benchSupport} />
+          <StudioPhoto photo={photos.interior} />
+          <span>Seu espaço para evoluir.</span>
         </div>
         <div className="hero-stamp" aria-hidden="true">
           <Sparkles size={22} />
@@ -243,6 +252,33 @@ function About() {
   );
 }
 function Method() {
+  const [selected, setSelected] = useState(0);
+  const features = [
+    {
+      number: "01",
+      icon: Target,
+      title: "O seu objetivo guia o treino.",
+      text: "Treinos individualizados e personalizados, pensados para o seu ritmo e para o que faz sentido na sua rotina.",
+      photo: photos.barTraining,
+      caption: "Seu objetivo. Nossa orientação.",
+    },
+    {
+      number: "02",
+      icon: HeartPulse,
+      title: "Atenção em cada movimento.",
+      text: "Correção próxima, técnica e segurança. Um ambiente para evoluir com acompanhamento e cuidar da sua qualidade de vida.",
+      photo: photos.machineCare,
+      caption: "Presença e cuidado em cada repetição.",
+    },
+    {
+      number: "03",
+      icon: ScanLine,
+      title: "Cuidado que olha o todo.",
+      text: "Avaliações por bioimpedância para acompanhar sua composição corporal e observar sua evolução ao longo dos treinos.",
+      photo: photos.ambient,
+      caption: "Um espaço pensado para cuidar de você.",
+    },
+  ];
   return (
     <section
       id="metodo"
@@ -262,42 +298,56 @@ function Method() {
         </p>
       </div>
       <div className="method-layout">
-        <div className="equipment-photo">
-          <StudioPhoto photo={photos.equipment} />
-          <span className="equipment-caption">
-            Estrutura para o seu movimento.
+        <div className="method-photo">
+          {features.map((item, index) => (
+            <div
+              className={`method-photo-layer ${selected === index ? "is-active" : ""}`}
+              key={item.number}
+              aria-hidden={selected !== index}
+            >
+              <StudioPhoto photo={item.photo} />
+              <span className="equipment-caption">
+                <span>{item.number} /</span>
+                {item.caption}
+              </span>
+            </div>
+          ))}
+          <span className="method-photo-tag" aria-hidden="true">
+            FEITO PARA VOCÊ.
           </span>
         </div>
         <div className="method-features">
-          {[
-            {
-              number: "01",
-              icon: Target,
-              title: "O seu objetivo guia o treino.",
-              text: "Treinos individualizados e personalizados, pensados para o seu ritmo e para o que faz sentido na sua rotina.",
-            },
-            {
-              number: "02",
-              icon: HeartPulse,
-              title: "Atenção em cada movimento.",
-              text: "Correção próxima, técnica e segurança. Um ambiente para evoluir com acompanhamento e cuidar da sua qualidade de vida.",
-            },
-            {
-              number: "03",
-              icon: ScanLine,
-              title: "Cuidado que olha o todo.",
-              text: "Avaliações por bioimpedância para acompanhar sua composição corporal e observar sua evolução ao longo dos treinos.",
-            },
-          ].map((item) => (
-            <article className="method-feature" key={item.number}>
-              <span className="feature-number">{item.number}</span>
-              <div>
-                <item.icon size={23} aria-hidden="true" />
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </div>
-            </article>
-          ))}
+          <div
+            className="method-options"
+            role="group"
+            aria-label="Conheça nosso cuidado"
+          >
+            {features.map((item, index) => (
+              <button
+                type="button"
+                className="method-feature"
+                key={item.number}
+                aria-pressed={selected === index}
+                onMouseEnter={() => setSelected(index)}
+                onFocus={() => setSelected(index)}
+                onClick={() => setSelected(index)}
+              >
+                <span className="feature-number">{item.number}</span>
+                <span className="feature-content">
+                  <span className="feature-heading">
+                    <item.icon size={23} aria-hidden="true" />
+                    <span>{item.title}</span>
+                  </span>
+                  <span className="feature-description">{item.text}</span>
+                </span>
+                <ArrowUpRight
+                  className="feature-arrow"
+                  size={20}
+                  aria-hidden="true"
+                />
+              </button>
+            ))}
+          </div>
           <a
             className="method-contact text-link"
             href={whatsappLink(
@@ -346,10 +396,7 @@ function Plans() {
           {publicPlanDays.map((days) => {
             const plan = plans?.find((p) => p.days === days);
             return (
-              <article
-                key={days}
-                className={`plan-card ${days === 3 ? "featured-plan" : ""}`}
-              >
+              <article key={days} className="plan-card">
                 <span className="plan-label">PLANO MENSAL</span>
                 <h3>
                   <strong>{days}×</strong>
@@ -492,13 +539,14 @@ function Contact() {
           <div>
             <MapPin size={23} />
             <span>ONDE ESTAMOS</span>
-            <strong>Franca, São Paulo</strong>
-            <a
-              href="https://www.google.com/maps/search/?api=1&query=Studio%20de%20Personal%20Katielle%20Faleiros%20Franca%20SP"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Buscar o studio no mapa <ArrowUpRight size={16} />
+            <strong>{studio.street}</strong>
+            <p>
+              {studio.neighborhood} · {studio.location}
+              <br />
+              CEP {studio.postalCode}
+            </p>
+            <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+              Abrir no Google Maps <ArrowUpRight size={16} />
             </a>
           </div>
           <div>
@@ -524,6 +572,31 @@ function Contact() {
               rel="noopener noreferrer"
             >
               @katiifaleiros <ArrowUpRight size={18} />
+            </a>
+          </div>
+        </div>
+        <div className="contact-map">
+          <div className="map-frame">
+            <iframe
+              title="Localização do Studio Katielle Faleiros em Franca"
+              src={mapEmbedUrl}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allowFullScreen
+            />
+          </div>
+          <div className="map-caption">
+            <p>
+              <MapPin size={19} aria-hidden="true" />
+              <span>
+                {studio.street}
+                <small>
+                  {studio.neighborhood} · Franca, SP · {studio.postalCode}
+                </small>
+              </span>
+            </p>
+            <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+              Ver localização <ArrowUpRight size={18} />
             </a>
           </div>
         </div>
@@ -583,8 +656,11 @@ export default function App() {
             description:
               "Studio de personal em Franca, SP, com treinamento individualizado, orientação próxima e mais de 15 anos de experiência de Katielle Faleiros.",
             telephone: "+5516992148454",
+            hasMap: mapUrl,
             address: {
               "@type": "PostalAddress",
+              streetAddress: `${studio.street} - ${studio.neighborhood}`,
+              postalCode: studio.postalCode,
               addressLocality: "Franca",
               addressRegion: "SP",
               addressCountry: "BR",

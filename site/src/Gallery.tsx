@@ -17,11 +17,17 @@ export function Gallery() {
   const updatePosition = () => {
     const el = track.current;
     if (!el) return;
-    const card = el.firstElementChild?.getBoundingClientRect().width || 1;
-    const gap = Number.parseFloat(getComputedStyle(el).columnGap) || 0;
-    setPosition(
-      Math.min(items.length - 1, Math.round(el.scrollLeft / (card + gap))),
-    );
+    const cards = Array.from(el.children) as HTMLElement[];
+    const start = cards[0]?.offsetLeft || 0;
+    let closest = 0;
+    cards.forEach((card, index) => {
+      if (
+        Math.abs(card.offsetLeft - start - el.scrollLeft) <
+        Math.abs(cards[closest].offsetLeft - start - el.scrollLeft)
+      )
+        closest = index;
+    });
+    setPosition(closest);
     setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
   };
   useEffect(() => {
@@ -40,10 +46,10 @@ export function Gallery() {
   const move = (direction: number) => {
     const el = track.current;
     if (!el) return;
-    const card = el.firstElementChild?.getBoundingClientRect().width || 1;
-    const gap = Number.parseFloat(getComputedStyle(el).columnGap) || 0;
-    el.scrollBy({
-      left: direction * (card + gap),
+    const cards = Array.from(el.children) as HTMLElement[];
+    const next = Math.max(0, Math.min(cards.length - 1, position + direction));
+    el.scrollTo({
+      left: cards[next].offsetLeft - cards[0].offsetLeft,
       behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "instant"
         : "smooth",
@@ -79,7 +85,7 @@ export function Gallery() {
           role="group"
           aria-label="Filtrar fotos"
         >
-          {["Todos", "Treinos", "Estrutura", "Comunidade"].map((name) => (
+          {["Todos", "Treinos", "Estrutura", "A personal"].map((name) => (
             <button
               key={name}
               type="button"
@@ -125,7 +131,10 @@ export function Gallery() {
         }}
       >
         {items.map((item, index) => (
-          <li key={item.photo.id} className="gallery-slide">
+          <li
+            key={item.photo.id}
+            className={`gallery-slide ${item.photo.width > item.photo.height ? "is-landscape" : ""}`}
+          >
             <button
               type="button"
               className="gallery-photo-button"
@@ -162,7 +171,7 @@ export function Gallery() {
       </div>
       <dialog
         ref={dialog}
-        className="photo-dialog"
+        className={`photo-dialog ${view !== null && items[view].photo.width > items[view].photo.height ? "is-landscape" : ""}`}
         aria-labelledby={captionId}
         onCancel={(e) => {
           e.preventDefault();

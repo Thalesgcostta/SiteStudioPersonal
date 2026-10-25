@@ -114,33 +114,33 @@ test("carrossel filtra, navega e amplia fotos com teclado e fechamento por Escap
     .getByRole("navigation", { name: "Navegação do site" })
     .getByRole("link", { name: "Galeria", exact: true })
     .click();
-  await expect(page.locator(".gallery-slide")).toHaveCount(18);
+  await expect(page.locator(".gallery-slide")).toHaveCount(16);
   await page
     .getByRole("button", { name: "Próximas fotos", exact: true })
     .click();
-  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 18");
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
   await page
     .getByRole("group", { name: "Filtrar fotos" })
     .getByRole("button", { name: "Estrutura", exact: true })
     .click();
-  await expect(page.locator(".gallery-slide")).toHaveCount(3);
-  await expect(page.locator(".gallery-bottom")).toContainText("Foto 1 de 3");
+  await expect(page.locator(".gallery-slide")).toHaveCount(5);
+  await expect(page.locator(".gallery-bottom")).toContainText("Foto 1 de 5");
   const button = page.getByRole("button", {
-    name: "Ampliar foto: Nosso espaço em Franca",
+    name: "Ampliar foto: Por dentro do nosso studio",
     exact: true,
   });
   await button.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Nosso espaço em Franca");
+  await expect(dialog).toContainText("Por dentro do nosso studio");
   await dialog.press("ArrowRight");
-  await expect(dialog).toContainText("Estrutura para o seu treino");
+  await expect(dialog).toContainText("Um ambiente para cuidar de você");
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
   await expect(button).toBeFocused();
   await page
     .getByRole("group", { name: "Filtrar fotos" })
-    .getByRole("button", { name: "Comunidade", exact: true })
+    .getByRole("button", { name: "A personal", exact: true })
     .click();
   await expect(page.locator(".gallery-slide")).toHaveCount(1);
   await expect(
@@ -178,7 +178,7 @@ test("fotos reais carregam e a ampliação preserva a imagem inteira", async ({
       width: img.naturalWidth,
       height: img.naturalHeight,
     }));
-  expect(hero).toEqual({ width: 720, height: 1280 });
+  expect(hero).toEqual({ width: 2336, height: 4160 });
   await page
     .getByRole("button", {
       name: "Ampliar foto: Treino individualizado",
@@ -190,7 +190,7 @@ test("fotos reais carregam e a ampliação preserva a imagem inteira", async ({
   await expect
     .poll(() =>
       photo.evaluate(
-        (img: HTMLImageElement) => img.complete && img.naturalWidth === 335,
+        (img: HTMLImageElement) => img.complete && img.naturalWidth === 720,
       ),
     )
     .toBe(true);
@@ -316,6 +316,13 @@ test("desktop e celular preservam layout, contraste, menu e perguntas", async ({
         ),
     )
     .toBe(true);
+  await page.locator(".hero").evaluate(async (hero) => {
+    await Promise.all(
+      hero
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => {})),
+    );
+  });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({
     path: "/tmp/studio-public-desktop.png",
@@ -357,4 +364,95 @@ test("desktop e celular preservam layout, contraste, menu e perguntas", async ({
     fullPage: true,
   });
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
+test("nova apresentação destaca a marca, usa FotoKatielle e mantém todos os planos iguais", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("img", { name: "KF — Katielle Faleiros Personal Trainer" }),
+  ).toBeVisible();
+  await expect(page.locator("#studio img")).toHaveAttribute(
+    "src",
+    "/media/katielle-apresentacao.jpg",
+  );
+  const palettes = await page.locator(".plan-card").evaluateAll((cards) =>
+    cards.map((card) => {
+      const css = getComputedStyle(card);
+      const button = getComputedStyle(card.querySelector(".plan-contact")!);
+      return {
+        background: css.backgroundColor,
+        color: css.color,
+        border: css.borderColor,
+        transform: css.transform,
+        button: button.backgroundColor,
+      };
+    }),
+  );
+  expect(new Set(palettes.map((palette) => JSON.stringify(palette))).size).toBe(
+    1,
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator(".hero-brand")).toHaveCSS("animation-name", "none");
+  await expect(page.locator(".hero-visual")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+});
+
+test("itens do método respondem ao mouse, teclado e toque com a foto correspondente", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const group = page.getByRole("group", { name: "Conheça nosso cuidado" });
+  const buttons = group.getByRole("button");
+  await expect(buttons).toHaveCount(3);
+  await expect(buttons.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await buttons.nth(1).hover();
+  await expect(buttons.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator(".method-photo-layer.is-active img"),
+  ).toHaveAttribute("src", "/media/cuidado-na-maquina.jpg");
+  await buttons.nth(2).focus();
+  await expect(buttons.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator(".method-photo-layer.is-active img"),
+  ).toHaveAttribute("src", "/media/studio-iluminacao.jpg");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await buttons.nth(0).click();
+  await expect(buttons.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator(".method-photo-layer.is-active img"),
+  ).toHaveAttribute("src", "/media/acompanhamento-no-supino.jpg");
+});
+
+test("contato incorpora mapa real com endereço completo e link externo correspondente", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const map = page.locator(".contact-map iframe");
+  await expect(map).toHaveAttribute(
+    "title",
+    "Localização do Studio Katielle Faleiros em Franca",
+  );
+  const src = new URL((await map.getAttribute("src"))!);
+  expect(src.origin).toBe("https://www.google.com");
+  expect(src.searchParams.get("output")).toBe("embed");
+  expect(src.searchParams.get("q")).toBe(
+    "R. Moacir Falaguasta, 2705 - Jardim Tropical, Franca - SP, 14407-061",
+  );
+  await expect(page.locator(".contact-details")).toContainText(
+    "R. Moacir Falaguasta, 2705",
+  );
+  const url = new URL(
+    (await page
+      .getByRole("link", { name: "Ver localização", exact: true })
+      .getAttribute("href"))!,
+  );
+  expect(url.searchParams.get("query")).toBe(src.searchParams.get("q"));
+  const structured = JSON.parse(
+    (await page.locator('script[type="application/ld+json"]').textContent())!,
+  );
+  expect(structured.address.postalCode).toBe("14407-061");
 });

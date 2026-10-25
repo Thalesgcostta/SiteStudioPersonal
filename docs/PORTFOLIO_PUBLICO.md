@@ -4,42 +4,40 @@ O site institucional está em `site/`. Ele tem entrada HTML, código, estilos, c
 
 ## Imagens e composição
 
-As 21 imagens dos arquivos `Imagens.zip` e `ImagensNovas.zip` estão incorporadas em `site/public/media/`, com nomes descritivos e sem recompressão. A abertura usa duas das novas fotos de 720×1280; os retratos de Katielle ficam na apresentação. O carrossel reúne 18 fotos entre treinos, estrutura e comunidade, com filtros e ampliação por teclado.
+A atualização de outubro usa as **16 fotos de `FotosNovas.zip`**, preservadas na resolução nativa e sem recompressão. As imagens anteriores não são mais exibidas. Os nomes descritivos abaixo estão em `site/public/media/` e o build verifica sua existência antes de publicar.
 
-O build público verifica a existência dos arquivos abaixo e interrompe a publicação se algum estiver faltando. Não afeta o build do administrativo.
-
-| Ordem na mensagem | Conteúdo                                   | Arquivo em `site/public/media/` | Uso no site                                   |
-| ----------------- | ------------------------------------------ | ------------------------------- | --------------------------------------------- |
-| 1                 | Halteres com iluminação roxa               | `halteres.jpg`                  | Estrutura e cuidado; galeria                  |
-| 2                 | Katielle orientando aluna no banco         | `acompanhamento-individual.jpg` | Carrossel de treinos                          |
-| 3                 | Orientação a aluno com halter              | `correcao-movimentos.jpg`       | Carrossel de treinos                          |
-| 4                 | Katielle e aluno sorrindo com halteres     | `treino-acompanhado.jpg`        | Carrossel de treinos                          |
-| 5                 | Katielle no aparelho, de perfil            | `tecnica-katielle.jpg`          | Técnica na prática, no carrossel              |
-| 6                 | Orientação de postura de aluna sentada     | `orientacao-proxima.jpg`        | Acompanhamento próximo, no carrossel          |
-| 7                 | Aluno na puxada com texto na foto          | `atendimento-personalizado.jpg` | Carrossel, preservando o texto original       |
-| 8                 | Aluna de rosa no aparelho                  | `aluna-em-treino.jpg`           | Carrossel, preservando a marca original       |
-| 9                 | Katielle sorrindo e fazendo sinal positivo | `katielle-no-studio.jpg`        | Apresentação da profissional                  |
-| 10                | Retrato quadrado de Katielle               | `katielle-retrato.jpg`          | Avatar menor na apresentação inicial          |
-| 11                | Vista aérea da fachada                     | `fachada-studio.jpg`            | Estrutura/localização, no carrossel           |
-| 12                | Marca KF em formato horizontal             | `marca-kf.webp`                 | Identidade na seção de contato                |
-| 13                | Foto da parceria local                     | `comunidade-studio.jpg`         | Comunidade, sem anunciar uma promoção vigente |
-
-| Fotos novas | Arquivo em `site/public/media/` | Uso |
+| Original | Arquivo publicado | Uso e composição |
 | --- | --- | --- |
-| Orientação com barra | `orientacao-na-barra.jpg` | Abertura do carrossel |
-| Apoio no exercício de banco | `apoio-no-banco.jpg` | Foto secundária da abertura e carrossel |
-| Demonstração de remada | `treino-de-remada.jpg` | Carrossel de treinos |
-| Acompanhamento na polia | `treino-na-polia.jpg` | Foto principal da abertura e carrossel |
-| Desenvolvimento de ombros | `treino-de-ombros.jpg` | Carrossel de treinos |
-| Orientação no aparelho | `cuidado-no-aparelho.jpg` | Carrossel de treinos |
-| Correção do movimento | `ajuste-de-movimento.jpg` | Carrossel de treinos |
-| Ambiente e iluminação | `interior-studio.jpg` | Carrossel de estrutura |
+| FotoKatielle.jpeg | katielle-apresentacao.jpg | Apresentação “Um espaço menor”, avatar e galeria da personal. Recorte mantém rosto e postura. |
+| Alunos9.jpeg | orientacao-individual.jpg | Foto principal da abertura e galeria. Arquivo de 2336×4160 para o destaque maior. |
+| Estrutura3.jpeg | studio-vista-ampla.jpg | Foto secundária da abertura, capa do vídeo e galeria. Vista horizontal completa. |
+| Alunos10.jpeg | acompanhamento-no-supino.jpg | Item 01 do método e galeria: orientação de um exercício com barra. |
+| Alunos3.jpeg | cuidado-na-maquina.jpg | Item 02 do método e galeria: acompanhamento da postura no aparelho. |
+| Estrutura4.jpeg | studio-iluminacao.jpg | Item 03 do método e galeria: ambiente e estrutura. |
+| Alunos.jpeg | treino-de-remada-novo.jpg | Galeria: técnica na remada. |
+| Alunos2.jpeg | atendimento-na-polia.jpg | Galeria: orientação na polia. |
+| Alunos4.jpeg | ajuste-na-elevacao.jpg | Galeria: atenção ao movimento com halteres. |
+| Alunos5.jpeg | tecnica-no-movimento.jpg | Galeria: correção próxima do movimento. |
+| Alunos6.jpeg | orientacao-com-halteres.jpg | Galeria: desenvolvimento de ombros acompanhado. |
+| Alunos7.jpeg | atencao-na-puxada.jpg | Galeria: acompanhamento na puxada. |
+| Alunos8.jpeg | treino-no-banco.jpg | Galeria: exercício com halteres no banco. |
+| Estrutura1.jpeg | estrutura-anilhas.jpg | Galeria: anilhas e organização do espaço. |
+| Estrutura2.jpeg | estrutura-aparelhos.jpg | Galeria: aparelhos de musculação. |
+| Estrutura5.jpeg | halteres-do-studio.jpg | Galeria: pesos organizados. |
 
-As fotos verticais mantêm a proporção de aproximadamente 9:16 nos destaques e no carrossel. A ampliação abre a foto inteira, sem cortar o exercício ou os textos. O retrato de 225×225 não é usado como imagem grande. No celular, a foto dos halteres permite um recorte horizontal, pois o assunto é a estrutura, sem rostos.
+A abertura destaca a marca KF em vetor, com animação de entrada e transição das fotografias. Não bloqueia o conteúdo nem depende de vídeos automáticos. As animações respeitam `prefers-reduced-motion`.
+
+Os três itens do método são botões: mouse, foco pelo teclado ou toque selecionam a foto correspondente. O texto permanece disponível em todos eles. Nenhuma foto é apresentada como sendo de um exame de bioimpedância; a imagem do terceiro item representa o ambiente de cuidado.
+
+O carrossel alterna retratos e panoramas, com cartões maiores para as fotos horizontais e ampliação da imagem inteira. Os filtros são Treinos, Estrutura e A personal. Todos os quatro planos compartilham as mesmas cores e botões, sem plano em destaque. A consulta dos preços ao Supabase permanece igual.
+
+## Localização
+
+O contato exibe o endereço **R. Moacir Falaguasta, 2705 - Jardim Tropical, Franca - SP, 14407-061** e incorpora um mapa interativo do Google Maps, carregado quando o visitante se aproxima dessa seção. O endereço é usado também nos links externos do mapa e nos dados estruturados do site. Não é necessária uma chave de API ou configuração adicional no Cloudflare. O mapa depende do serviço e da conexão com o Google Maps; o link externo permanece disponível.
 
 ## Vídeo
 
-O arquivo de `VideoStudio.zip` está em `studio-em-movimento.mp4`: aproximadamente 20 segundos, 1024×576 e 4,2 MB. O áudio e o vídeo originais foram preservados; apenas a organização interna do MP4 foi ajustada para iniciar a reprodução sem baixar o arquivo inteiro (`faststart`). A capa `studio-video-capa.jpg` é um quadro do próprio vídeo.
+O arquivo de `VideoStudio.zip` está em `studio-em-movimento.mp4`: aproximadamente 20 segundos, 1024×576 e 4,2 MB. O áudio e o vídeo originais foram preservados; apenas a organização interna do MP4 foi ajustada para iniciar a reprodução sem baixar o arquivo inteiro (`faststart`). A capa atual `studio-vista-ampla.jpg` mostra a estrutura do studio em formato horizontal.
 
 A seção entre o método e a galeria mantém o formato horizontal 16:9. O MP4 só é solicitado após o visitante clicar em reproduzir. Há controles nativos de áudio, pausa e tela cheia, reprodução inline no celular, descrição visual e acesso direto ao arquivo em caso de erro. Não há reprodução automática.
 
