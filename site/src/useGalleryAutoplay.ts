@@ -35,7 +35,7 @@ export function useGalleryAutoplay(
   const running = visible && pageVisible && !paused && !reduced && !suspended;
   useEffect(() => {
     if (!running) return;
-    const timer = window.setInterval(() => callback.current(), 3000);
+    const timer = window.setInterval(() => callback.current(), 2500);
     return () => window.clearInterval(timer);
   }, [running, category]);
   return { running, paused, setPaused, reduced: !!reduced };

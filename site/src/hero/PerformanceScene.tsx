@@ -55,7 +55,11 @@ export function PerformanceScene({ metrics, motion, paused }: Props) {
             { radius: 148, color: "#579aba", progress: 0.73 },
             { radius: 124, color: "#bddec9", progress: 0.62 },
           ].map((ring, index) => (
-            <g key={ring.radius} transform="rotate(-90 200 200)">
+            <g
+              className={`activity-ring activity-ring-${index}`}
+              key={ring.radius}
+              transform="rotate(-90 200 200)"
+            >
               <circle
                 className="ring-track"
                 cx="200"

@@ -451,13 +451,13 @@ test("contato incorpora mapa real com endereço completo e link externo correspo
   expect(structured.address.postalCode).toBe("14407-061");
 });
 
-test("planos usam o azul da marca e ampliam no hover sem destacar um plano", async ({
+test("planos retomam a cor clara anterior e mantêm zoom no hover", async ({
   page,
 }) => {
   await page.goto("/");
   const cards = page.locator(".plan-card");
   for (const card of await cards.all())
-    await expect(card).toHaveCSS("background-color", "rgb(87, 154, 186)");
+    await expect(card).toHaveCSS("background-color", "rgb(248, 247, 243)");
   await cards.nth(1).hover();
   await expect
     .poll(() =>
@@ -471,7 +471,7 @@ test("planos usam o azul da marca e ampliam no hover sem destacar um plano", asy
   await expect(cards.nth(1)).toHaveCSS("transform", "none");
 });
 
-test("carrossel avança a cada 3 segundos, pausa no hover e retorna ao início", async ({
+test("carrossel avança a cada 2,5 segundos, pausa no hover e retorna ao início", async ({
   page,
 }) => {
   await page.clock.install();
@@ -483,7 +483,7 @@ test("carrossel avança a cada 3 segundos, pausa no hover e retorna ao início",
     "aria-live",
     "off",
   );
-  await page.clock.fastForward(3100);
+  await page.clock.fastForward(2600);
   await expect(page.locator(".gallery-bottom")).toContainText("Foto 2 de 16");
   await track.hover();
   await expect(page.locator(".gallery-bottom p")).toHaveAttribute(
@@ -504,7 +504,7 @@ test("carrossel avança a cada 3 segundos, pausa no hover e retorna ao início",
     "aria-live",
     "off",
   );
-  await page.clock.fastForward(3100);
+  await page.clock.fastForward(2600);
   await expect
     .poll(() => track.evaluate((el) => el.scrollLeft))
     .toBeLessThan(2);
@@ -572,4 +572,61 @@ test("hero tem anéis, métricas ilustrativas e paralaxe com pausa", async ({
       card.evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).e),
     )
     .toBe(0);
+});
+
+test("todas as seções, cabeçalho e rodapé mantêm fundo escuro", async ({
+  page,
+}) => {
+  await page.goto("/");
+  for (const selector of [
+    ".hero",
+    ".about-section",
+    ".method-section",
+    ".video-section",
+    ".gallery-section",
+    ".plans-section",
+    ".questions-section",
+    ".contact-section",
+    ".site-footer",
+  ])
+    await expect(page.locator(selector)).toHaveCSS(
+      "background-color",
+      "rgb(11, 16, 19)",
+    );
+  await expect(page.locator(".site-header")).toHaveCSS(
+    "background-color",
+    "rgba(11, 16, 19, 0.96)",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+  await expect(
+    page.getByRole("navigation", { name: "Navegação do site" }),
+  ).toHaveCSS("background-color", "rgb(11, 16, 19)");
+});
+
+test("anéis giram continuamente e respeitam pausa e movimento reduzido", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const rings = page.locator(".activity-ring");
+  await expect(rings).toHaveCount(3);
+  for (const ring of await rings.all()) {
+    await expect(ring).toHaveCSS("animation-iteration-count", "infinite");
+    await expect(ring).toHaveCSS("animation-play-state", "running");
+  }
+  const first = rings.first();
+  const start = await first.evaluate((el) => getComputedStyle(el).transform);
+  await expect
+    .poll(() => first.evaluate((el) => getComputedStyle(el).transform))
+    .not.toBe(start);
+  await page
+    .getByRole("button", { name: "Pausar movimento da abertura" })
+    .click();
+  await expect(first).toHaveCSS("animation-play-state", "paused");
+  await page
+    .getByRole("button", { name: "Retomar movimento da abertura" })
+    .click();
+  await expect(first).toHaveCSS("animation-play-state", "running");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(first).toHaveCSS("animation-name", "none");
 });

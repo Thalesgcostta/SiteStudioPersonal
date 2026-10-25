@@ -147,7 +147,7 @@ export function Gallery() {
             title={
               playback.reduced
                 ? "Movimento reduzido: use as setas para navegar"
-                : "Troca automática a cada 3 segundos"
+                : "Troca automática a cada 2,5 segundos"
             }
             onClick={() => playback.setPaused(!playback.paused)}
           >

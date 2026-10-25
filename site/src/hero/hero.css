@@ -136,6 +136,26 @@
   height: 100%;
   overflow: visible;
 }
+/* Rotate the rings independently; the KF remains steady and readable. */
+.activity-ring {
+  transform-origin: 200px 200px;
+  animation: ring-orbit 18s linear infinite;
+}
+.activity-ring-1 {
+  animation-duration: 24s;
+  animation-direction: reverse;
+}
+.activity-ring-2 {
+  animation-duration: 30s;
+}
+@keyframes ring-orbit {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
 .orbit-guide {
   fill: none;
   stroke: #97b1bd30;
@@ -408,7 +428,7 @@
 }
 .hero.is-still *,
 .hero-visual.is-still * {
-  animation: none !important;
+  animation-play-state: paused !important;
 }
 @media (max-width: 1150px) {
   .hero-layout {
@@ -662,4 +682,6 @@
   }
 }
 
-.hero + .about-section { margin-top: 0; }
+.hero + .about-section {
+  margin-top: 0;
+}
