@@ -445,7 +445,7 @@ export function assertStore(value: unknown): asserts value is Store {
       "movements",
     ].every((key) => Array.isArray(s[key as keyof Store])) ||
     !s.settings ||
-    s.settings.planPrices?.length !== 5
+    ![5, 6].includes(s.settings.planPrices?.length ?? 0)
   )
     throw new Error(
       "Resposta do banco inválida. Confira se as migrações foram executadas.",

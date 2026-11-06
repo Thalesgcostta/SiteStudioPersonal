@@ -87,6 +87,7 @@ test.beforeAll(async () => {
     ),
   );
   await db.exec(await readFile("supabase/migrations/202610170008_student_deletion.sql", "utf8"));
+  await db.exec(await readFile("supabase/migrations/202611060009_image_consent.sql", "utf8"));
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -1100,11 +1101,17 @@ test("formulário público salva no banco sem login nem sessão administrativa e
   await page.getByLabel("Bairro", { exact: true }).fill("Centro");
   await page.getByLabel("Cidade", { exact: true }).fill("Franca");
   await page.getByLabel("Estado", { exact: true }).selectOption("SP");
-  for (const day of ["Segunda", "Quarta", "Sexta"])
+  await page.getByLabel("Frequência desejada").selectOption("6");
+  await expect(page.getByRole("option", {name:/6 vezes por semana/})).toContainText("R$ 600,00");
+  for (const day of ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"])
     await page.getByRole("button", { name: day, exact: true }).click();
   await page
     .getByLabel("Autorizo o uso destas informações", { exact: false })
     .check();
+  const imageConsent = page.getByLabel("Autorizo o uso da minha imagem", {exact:false});
+  await expect(imageConsent).not.toBeChecked();
+  await expect(imageConsent).not.toHaveAttribute("required", "");
+  await imageConsent.check();
   const failures = (
     await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
   ).violations;
@@ -1153,6 +1160,10 @@ test("formulário público salva no banco sem login nem sessão administrativa e
   expect(saved.students).toHaveLength(1);
   expect(saved.students[0].addressFields.number).toBe("27B");
   expect(saved.students[0].registrationPending).toBe(true);
+  expect(saved.students[0].plan).toBe(6);
+  expect(saved.students[0].imageConsent).toBe(true);
+  expect(saved.students[0].imageConsentVersion).toBe("2026-11-06-v1");
+  expect(saved.students[0].imageConsentAt).toBeTruthy();
   expect(saved.bills).toHaveLength(0);
   await page.evaluate(() => localStorage.clear());
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -1164,6 +1175,7 @@ test("formulário público salva no banco sem login nem sessão administrativa e
     .getByRole("button", { name: /Aluno pelo link/ })
     .first()
     .click();
+  await expect(page.locator("dd").filter({hasText:/^Autorizado/})).toBeVisible();
   await page
     .getByRole("button", { name: "Ativar cadastro", exact: true })
     .click();
@@ -1176,6 +1188,7 @@ test("formulário público salva no banco sem login nem sessão administrativa e
   ).rows[0].data;
   expect(saved.students[0].active).toBe(true);
   expect(saved.bills).toHaveLength(1);
+  expect(saved.bills[0].amount).toBe(600);
 });
 
 test("despesas fixas editam a previsão e preservam o valor pago no financeiro real", async ({

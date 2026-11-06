@@ -19,6 +19,7 @@ type Config = {
   open: string;
   close: string;
   plans: { days: number; monthlyPrice: number }[];
+  imageConsentVersion?: string;
 };
 function Registration() {
   useCalendar();
@@ -43,6 +44,7 @@ function Registration() {
     days: [] as number[],
     times: {} as Record<number, string>,
     consent: false,
+    imageConsent: false,
   });
   useEffect(() => {
     let active = true;
@@ -81,8 +83,10 @@ function Registration() {
       setError(`Escolha ${form.plan} dias de preferência.`);
       return;
     }
+    const { imageConsent, ...registration } = form;
     const student = {
-      ...form,
+      ...registration,
+      ...(config?.imageConsentVersion ? { imageConsent } : {}),
       name: form.name.trim(),
       cpf: form.cpf.replace(/\D/g, ""),
     };
@@ -336,6 +340,24 @@ function Registration() {
                       treinos.
                     </span>
                   </label>
+                  {config.imageConsentVersion && (
+                    <label className="registration-consent">
+                      <input
+                        type="checkbox"
+                        checked={form.imageConsent}
+                        disabled={saving}
+                        onChange={(e) =>
+                          setForm({ ...form, imageConsent: e.target.checked })
+                        }
+                      />
+                      <span>
+                        Autorizo o uso da minha imagem em fotos e vídeos para
+                        divulgação do studio em seu site e redes sociais.
+                        Esta autorização é opcional e pode ser revogada entrando
+                        em contato com o studio.
+                      </span>
+                    </label>
+                  )}
                   {error && (
                     <p className="form-error" role="alert">
                       {error}

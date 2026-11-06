@@ -721,6 +721,17 @@ export function StudentProfile({ id }: { id: string }) {
             <dd>{s.address || "Não informado"}</dd>
             <dt>Contato de emergência</dt>
             <dd>{s.emergency || "Não informado"}</dd>
+            <dt>Uso de imagem para divulgação</dt>
+            <dd>
+              {s.imageConsent === true
+                ? "Autorizado"
+                : s.imageConsent === false
+                  ? "Não autorizado"
+                  : "Não informado"}
+              {s.imageConsentAt && (
+                <small> · Registrado em {new Date(s.imageConsentAt).toLocaleString("pt-BR")}</small>
+              )}
+            </dd>
             <dt>No studio desde</dt>
             <dd>{dateLabel(s.start)}</dd>
           </dl>

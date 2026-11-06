@@ -32,7 +32,7 @@ export const methods = [
   "Cartão de débito",
   "Cartão de crédito",
 ];
-export const plans = [160, 220, 280, 360, 420];
+export const plans = [160, 220, 280, 360, 420, 600];
 export type Student = {
   id: string;
   name: string;
@@ -43,6 +43,9 @@ export type Student = {
   address: string;
   addressFields?: Address | null;
   registrationPending?: boolean;
+  imageConsent?: boolean | null;
+  imageConsentAt?: string | null;
+  imageConsentVersion?: string | null;
   emergency: string;
   start: string;
   active: boolean;

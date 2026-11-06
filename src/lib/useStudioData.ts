@@ -13,7 +13,10 @@ function loadDemo() {
     if (raw) {
       const s: unknown = JSON.parse(raw);
       assertStore(s);
-      return upgradeStore(s);
+      const upgraded = upgradeStore(s);
+      if (upgraded.settings.planPrices.length === 5)
+        upgraded.settings.planPrices = [...upgraded.settings.planPrices, 600];
+      return upgraded;
     }
   } catch {
     /* Somente exemplos locais. */

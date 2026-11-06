@@ -17,6 +17,12 @@ Siga o [passo a passo do Supabase](docs/SUPABASE.md) para criar o projeto, execu
 
 O banco real inicia sem os exemplos do navegador. Os modos não importam dados um do outro. Configure `VITE_DATA_MODE=supabase` explicitamente na hospedagem do cliente.
 
+## Plano de 6 vezes por semana e autorização de imagem
+
+A atualização [009](supabase/migrations/202611060009_image_consent.sql) inclui o plano de **6 vezes por semana por R$ 600,00**, compartilhado entre gestão, portfólio e cadastro por link. Inclui também autorização opcional de uso de imagem, registrada com data e versão do termo e exibida no perfil do aluno. Consulte [as instruções de publicação](docs/ATUALIZACAO_PLANOS_IMAGEM.md).
+
+O portfólio público é publicado pela branch `feat/public-portfolio`. Esta branch `main` contém a gestão e gera `dist`, incluindo `cadastro.html`.
+
 ## Desenvolvimento
 
 Requisitos: Node.js 22 ou superior e npm. Dentro da pasta do projeto:

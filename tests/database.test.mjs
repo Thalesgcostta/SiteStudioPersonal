@@ -146,7 +146,8 @@ before(async () => {
   await db.exec(routine);
   const deletion = await readFile(new URL("../supabase/migrations/202610170008_student_deletion.sql", import.meta.url), "utf8");
   await db.exec(deletion);
-  await db.exec(deletion);
+  await db.exec(await readFile(new URL("../supabase/migrations/202611060009_image_consent.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../supabase/migrations/202611060009_image_consent.sql", import.meta.url), "utf8"));
   await db.query("delete from public.studio_admins where user_id=$1", [
     outsider,
   ]);
@@ -162,7 +163,7 @@ before(async () => {
 });
 beforeEach(async () => {
   await db.exec(
-    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences,public.recurring_expenses,public.registration_submissions cascade;update public.registration_access set enabled=true;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 else 420 end;",
+    "reset role;truncate public.students,public.products,public.movements,public.mutation_requests,public.dashboard_preferences,public.recurring_expenses,public.registration_submissions cascade;update public.registration_access set enabled=true;update public.plans set monthly_price=case days when 1 then 160 when 2 then 220 when 3 then 280 when 4 then 360 when 5 then 420 else 600 end;",
   );
   await db.exec(
     "update public.studio_settings set evaluation_price=0,max_per_slot=4;",
@@ -178,7 +179,7 @@ test("migrações criam banco vazio com planos e configurações, sem exemplos",
   assert.deepEqual(s.students, []);
   assert.deepEqual(s.products, []);
   assert.deepEqual(s.bills, []);
-  assert.deepEqual(s.settings.planPrices, [160, 220, 280, 360, 420]);
+  assert.deepEqual(s.settings.planPrices, [160, 220, 280, 360, 420, 600]);
 });
 test("anônimo não consegue consultar ou alterar dados", async () => {
   await db.exec("reset role;set role anon");
@@ -461,7 +462,7 @@ test("despesa e configuração persistem sem alterar cobranças emitidas", async
   const settings = {
     ...store.settings,
     phone: "(16) 99999-0000",
-    planPrices: [170, 230, 290, 370, 430],
+    planPrices: [170, 230, 290, 370, 430, 620],
   };
   const result = await action("save_settings", { settings });
   assert.deepEqual(result.settings.planPrices, settings.planPrices);
@@ -510,7 +511,7 @@ test("usuário criado no Authentication recebe papel administrativo automaticame
   await db.exec("reset role");
   await db.query("insert into auth.users(id) values($1)", [id]);
   await role(id);
-  assert.equal((await state()).schemaVersion, 8);
+  assert.equal((await state()).schemaVersion, 9);
 });
 test("capacidade bloqueia novos encaixes e reativação, mas preserva horários antigos", async () => {
   const first = student();
@@ -1159,4 +1160,56 @@ test("exclusão exige administrador e funções internas permanecem privadas", a
   await assert.rejects(() => action("delete_student",{id:s.id,expectedName:s.name}), /permission denied/);
   await role();
   assert.equal((await state()).students.length,1);
+});
+
+
+test("plano de 6 dias compartilha preço público, gera mensalidade e preserva o preço ao repetir a migração", async () => {
+  let store = await action("save_student", { student: {...student(), plan: 6, days: [0,1,2,3,4,5], times: {0:"07:00",1:"07:00",2:"07:00",3:"07:00",4:"07:00",5:"07:00"}} });
+  assert.equal(store.bills[0].amount, 600);
+  await action("save_settings", {settings: {...store.settings, planPrices: [160,220,280,360,420,650]}});
+  await db.exec("reset role");
+  await db.exec(await readFile(new URL("../supabase/migrations/202611060009_image_consent.sql", import.meta.url), "utf8"));
+  await db.exec("set role anon");
+  const prices = (await db.query("select public.get_public_studio_plans() as data")).rows[0].data;
+  assert.deepEqual(prices.map(p => p.days), [2,3,4,5,6]);
+  assert.equal(prices.at(-1).monthlyPrice, 650);
+  const token = await registrationToken();
+  await db.exec("set role anon");
+  const config = (await db.query("select public.get_public_registration_config($1::uuid) as data",[token])).rows[0].data;
+  assert.equal(config.plans.at(-1).monthlyPrice, 650);
+  assert.equal(config.imageConsentVersion,"2026-11-06-v1");
+  await submitPublic(token, {...registrationPayload(), cpf:"55566677788", plan:6, days:[0,1,2,3,4,5], times:{0:"08:00",1:"08:00",2:"08:00",3:"08:00",4:"08:00",5:"08:00"}});
+  await role();
+  store = await state();
+  assert.equal(store.bills[0].amount, 600);
+  const pending = store.students.find(s=>s.registrationPending);
+  store = await action("set_student_active",{id:pending.id,active:true});
+  assert.equal(store.bills.find(b=>b.studentId===pending.id).amount,650);
+});
+
+test("autorização de imagem registra escolha e versão sem alterar cadastro existente", async () => {
+  const token = await registrationToken();
+  const request = randomUUID();
+  const payload = {...registrationPayload(), imageConsent:true};
+  await db.exec("set role anon");
+  await submitPublic(token,payload,request);
+  await submitPublic(token,payload,request);
+  await assert.rejects(()=>submitPublic(token,{...payload,imageConsent:false},request),/Envio inválido/);
+  await submitPublic(token,{...payload,imageConsent:false});
+  await role();
+  let saved = (await state()).students[0];
+  assert.equal(saved.imageConsent,true);
+  assert.equal(saved.imageConsentVersion,"2026-11-06-v1");
+  assert.ok(saved.imageConsentAt);
+  await db.exec("set role anon");
+  await assert.rejects(()=>submitPublic(token,{...payload,cpf:"11122233344",imageConsent:"true"}),/Confira nome/);
+  await submitPublic(token,{...payload,cpf:"11122233344",imageConsent:false});
+  await submitPublic(token,{...registrationPayload(),cpf:"22233344455"});
+  await role();
+  const students = (await state()).students;
+  assert.equal(students.find(s=>s.cpf==="11122233344").imageConsent,false);
+  assert.equal(students.find(s=>s.cpf==="22233344455").imageConsent,false);
+  const manual = {...student(), cpf:"66677788899"};
+  await action("save_student",{student:manual});
+  assert.equal((await state()).students.find(s=>s.id===manual.id).imageConsent,null);
 });
