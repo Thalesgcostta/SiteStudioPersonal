@@ -31,7 +31,7 @@ O código fica separado em `site/src/hero/`: `Hero.tsx` organiza a seção, `Per
 
 Os três itens do método são botões: mouse, foco pelo teclado ou toque selecionam a foto correspondente. O texto permanece disponível em todos eles. Nenhuma foto é apresentada como sendo de um exame de bioimpedância; a imagem do terceiro item representa o ambiente de cuidado.
 
-O carrossel alterna retratos e panoramas, com cartões maiores para as fotos horizontais e ampliação da imagem inteira. Os filtros são Treinos, Estrutura e A personal. Todos os quatro planos voltaram ao tom claro original `#f8f7f3` e ampliam suavemente no hover ou foco no botão, sem plano em destaque. O texto escuro mantém contraste sobre os cartões claros. A ampliação segue o controle de movimento do site. A consulta dos preços ao Supabase permanece igual.
+O carrossel alterna retratos e panoramas, com cartões maiores para as fotos horizontais e ampliação da imagem inteira. Os filtros são Treinos, Estrutura e A personal. Todos os cinco planos voltaram ao tom claro original `#f8f7f3` e ampliam suavemente no hover ou foco no botão, sem plano em destaque. O texto escuro mantém contraste sobre os cartões claros. A ampliação segue o controle de movimento do site. A consulta dos preços ao Supabase permanece igual.
 
 O carrossel avança automaticamente a cada **2,5 segundos** e retorna ao início ao chegar ao fim da área rolável. O visitante pode pausar e retomar pelo controle ao lado das setas. A reprodução fica suspensa fora da tela, em abas ocultas, durante hover nas fotos, foco pelo teclado, gesto de toque ou ampliação de foto. Passar o mouse pelo título ou pelos controles e clicar no botão de reprodução não prende a galeria em pausa. Trocar de categoria reinicia o intervalo. A navegação manual continua disponível pelas setas, filtros, teclado e gestos. O avanço automático começa por padrão, inclusive no PC, respeitando as pausas por interação. Durante o avanço automático, o contador não gera anúncios repetidos para leitores de tela.
 
@@ -68,9 +68,9 @@ npm run test:site
 
 ## Planos do administrativo
 
-No mesmo projeto Supabase do administrativo, execute no **SQL Editor** o conteúdo completo de [`supabase/migrations/202610170006_public_plans_two_to_five.sql`](../supabase/migrations/202610170006_public_plans_two_to_five.sql). Com as migrações 001 a 004 já aplicadas, esta atualização funciona com ou sem a 005 e pode ser repetida. Ela atualiza somente a função pública, sem alterar valores, cadastros ou históricos.
+No mesmo projeto Supabase do administrativo, aplique a migração `202611060009_image_consent.sql`, disponível na branch `main`, após a migração 008. Consulte [as instruções da gestão](https://github.com/Thalesgcostta/SiteStudioPersonal/blob/main/docs/ATUALIZACAO_PLANOS_IMAGEM.md). A atualização inclui o plano de 6 vezes por R$ 600,00 somente se ele ainda não existir e preserva os preços cadastrados.
 
-A função pública `get_public_studio_plans` retorna somente frequência semanal e valor mensal dos quatro planos de **2 a 5 dias por semana**. Alunos, CPF, contatos, agenda, vendas, avaliações, pagamentos, usuários e configurações administrativas continuam protegidos. O site usa a chave publishable/anon, sem login, sem `service_role` e sem sessão administrativa. A interface também aceita a versão anterior da função, mas exibe somente os quatro planos públicos.
+A função pública `get_public_studio_plans` retorna somente frequência semanal e valor mensal dos cinco planos de **2 a 6 dias por semana**. Alunos, CPF, contatos, agenda, vendas, avaliações, pagamentos, usuários e configurações administrativas continuam protegidos. O site usa a chave publishable/anon, sem login, sem `service_role` e sem sessão administrativa. A interface também aceita a RPC anterior: mantém os quatro preços existentes e apresenta somente o sexto plano como Consulte até a migração ser aplicada.
 
 Configure no ambiente local ou na hospedagem pública:
 
@@ -81,11 +81,11 @@ VITE_SUPABASE_PUBLISHABLE_KEY=mesma chave pública publishable
 
 Uma chave anon legada também é aceita em `VITE_SUPABASE_ANON_KEY`. Nunca use chaves secretas ou senha do banco. O site não depende de `VITE_DATA_MODE`.
 
-Alterar **Configurações → Planos e valores** no administrativo atualiza a consulta pública; o visitante verá os valores novos ao abrir ou recarregar o portfólio. Se a consulta falhar, os planos continuam disponíveis para contato, com preço **Consulte**, sem inventar um valor. Em desenvolvimento local sem configuração, aparecem os valores de referência iniciais do projeto para 2 a 5 dias (R$ 220, R$ 280, R$ 360 e R$ 420), identificados como referência. Esse fallback não é usado em produção.
+Alterar **Configurações → Planos e valores** no administrativo atualiza a consulta pública; o visitante verá os valores novos ao abrir ou recarregar o portfólio. Se a consulta falhar, os planos continuam disponíveis para contato, com preço **Consulte**, sem inventar um valor. Em desenvolvimento local sem configuração, aparecem os valores de referência iniciais do projeto para 2 a 6 dias (R$ 220, R$ 280, R$ 360, R$ 420 e R$ 600), identificados como referência. Esse fallback não é usado em produção.
 
 ## Publicação separada
 
-O projeto público usa a branch `feat/public-portfolio`. O build `npm run build:site` produz `dist-site/`, incluindo fotos, capa e vídeo. A publicação pode usar Cloudflare Workers com assets estáticos ou Cloudflare Pages; as duas variáveis públicas do Supabase devem estar disponíveis durante o **build** no projeto público, com a migração 006 aplicada no banco. Alterar as variáveis exige um novo build; adicioná-las somente ao runtime do Worker não altera os arquivos estáticos já gerados.
+O projeto público usa a branch `feat/public-portfolio`. O build `npm run build:site` produz `dist-site/`, incluindo fotos, capa e vídeo. A publicação pode usar Cloudflare Workers com assets estáticos ou Cloudflare Pages; as duas variáveis públicas do Supabase devem estar disponíveis durante o **build** no projeto público, com a migração 009 aplicada no banco. Alterar as variáveis exige um novo build; adicioná-las somente ao runtime do Worker não altera os arquivos estáticos já gerados.
 
 Em Workers, a publicação deve apontar explicitamente os assets para `dist-site` e o nome do Worker público. Em Pages, o diretório de saída é `dist-site`. O administrativo mantém seu próprio build e sua hospedagem.
 

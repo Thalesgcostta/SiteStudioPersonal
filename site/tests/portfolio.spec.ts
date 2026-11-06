@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import type { Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const api = "http://127.0.0.1:59999/rest/v1/rpc/get_public_studio_plans";
-const rates = [245, 315, 395, 470].map((monthlyPrice, index) => ({
+const rates = [245, 315, 395, 470, 600].map((monthlyPrice, index) => ({
   days: index + 2,
   monthlyPrice,
 }));
@@ -40,12 +40,13 @@ test("portfolio mostra informações, preços do banco e contatos sem carregar o
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Seu corpo.",
   );
-  await expect(page.locator(".plan-card")).toHaveCount(4);
+  await expect(page.locator(".plan-card")).toHaveCount(5);
   await expect(page.locator(".plan-card h3 strong")).toHaveText([
     "2×",
     "3×",
     "4×",
     "5×",
+    "6×",
   ]);
   await expect(page.locator(".plan-card").nth(1)).toContainText("R$ 315,00");
   expect((await request).headers().authorization).toBeUndefined();
@@ -72,10 +73,12 @@ test("portfolio mostra informações, preços do banco e contatos sem carregar o
     "(16) 99214-8454",
   );
   await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.locator(".plan-card").last()).toContainText("R$ 600,00");
+  await expect(page.getByRole("link", {name: "Conversar sobre o plano de 6 dias por semana", exact: true})).toHaveAttribute("href", /600/);
   expect(privateCalls).toEqual([]);
 });
 
-test("consulta anterior com cinco planos mantém 2 a 5 dias e atualiza preços ao recarregar", async ({
+test("consulta com seis planos mantém 2 a 6 dias e atualiza preços ao recarregar", async ({
   page,
 }) => {
   await page.route(api, (route) =>
@@ -87,6 +90,7 @@ test("consulta anterior com cinco planos mantém 2 a 5 dias e atualiza preços a
     "3×",
     "4×",
     "5×",
+    "6×",
   ]);
   await expect(page.locator(".plan-price").first()).toContainText("R$ 245,00");
   await expect(page.locator(".plan-grid")).not.toContainText("R$ 175,00");
@@ -729,4 +733,15 @@ test("retomar galeria no PC não prende o autoplay após clique de mouse", async
     "aria-live",
     "polite",
   );
+});
+
+
+test("RPC anterior preserva preços existentes e deixa apenas o sexto plano sob consulta", async ({page}) => {
+  await page.route(api, route => respond(route, rates.filter(plan => plan.days < 6)));
+  await page.goto("/");
+  await expect(page.locator(".plan-card")).toHaveCount(5);
+  await expect(page.locator(".plan-price").first()).toContainText("R$ 245,00");
+  await expect(page.locator(".plan-price").nth(3)).toContainText("R$ 470,00");
+  await expect(page.locator(".plan-price").last()).toHaveText("Consulte");
+  await expect(page.getByRole("link", {name:"Conversar sobre o plano de 6 dias por semana",exact:true})).not.toHaveAttribute("href", /600/);
 });

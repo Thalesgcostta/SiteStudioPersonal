@@ -333,6 +333,7 @@ function Plans() {
                       "Constância em movimento.",
                       "Mais dias para você.",
                       "O cuidado na sua semana.",
+                      "Uma semana completa de cuidado.",
                     ][days - 2]
                   }
                 </p>

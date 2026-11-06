@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 export type PublicPlan = { days: number; monthlyPrice: number };
-export const publicPlanDays = [2, 3, 4, 5] as const;
-const referencePlans: PublicPlan[] = [220, 280, 360, 420].map(
+export const publicPlanDays = [2, 3, 4, 5, 6] as const;
+const referencePlans: PublicPlan[] = [220, 280, 360, 420, 600].map(
   (monthlyPrice, index) => ({ days: publicPlanDays[index], monthlyPrice }),
 );
 class PublicPlansError extends Error {}
@@ -71,7 +71,7 @@ export function usePublicPlans() {
         if (!response.ok) {
           const advice =
             response.status === 404
-              ? "Confira a URL do projeto e execute a migração 006 para criar get_public_studio_plans no mesmo Supabase do administrativo."
+              ? "Confira a URL do projeto e execute a migração 009 para criar get_public_studio_plans no mesmo Supabase do administrativo."
               : response.status === 401 || response.status === 403
                 ? "Confira a chave pública do mesmo projeto e as permissões da função get_public_studio_plans."
                 : "Verifique a disponibilidade do projeto Supabase.";
@@ -87,29 +87,31 @@ export function usePublicPlans() {
         if (
           !Array.isArray(data) ||
           data.length < 4 ||
-          data.length > 5 ||
+          data.length > 6 ||
           !data.every(
             (p) =>
               p !== null &&
               typeof p === "object" &&
               Number.isInteger(p.days) &&
               p.days >= 1 &&
-              p.days <= 5 &&
+              p.days <= 6 &&
               Number.isFinite(p.monthlyPrice) &&
               p.monthlyPrice > 0,
           )
         )
           throw new PublicPlansError(
-            "Resposta de planos inválida. A função pública deve retornar days e monthlyPrice numéricos para os planos de 2 a 5 dias.",
+            "Resposta de planos inválida. A função pública deve retornar days e monthlyPrice numéricos para os planos de 2 a 6 dias.",
           );
-        // Aceita a função anterior com cinco planos durante a atualização do banco.
+        // Aceita a RPC anterior sem o sexto plano e ignora a frequência de 1 dia.
         const publicPlans: PublicPlan[] = data.filter((p) => p.days >= 2);
         if (
-          publicPlans.length !== publicPlanDays.length ||
-          new Set(publicPlans.map((p) => p.days)).size !== publicPlanDays.length
+          new Set(publicPlans.map((p) => p.days)).size !== publicPlans.length ||
+          !publicPlanDays.filter((days) => days !== 6).every((days) =>
+            publicPlans.some((plan) => plan.days === days),
+          )
         )
           throw new PublicPlansError(
-            "Planos incompletos ou duplicados. Confira os quatro planos de 2 a 5 dias no banco.",
+            "Planos incompletos ou duplicados. Confira os cinco planos de 2 a 6 dias no banco.",
           );
         if (active) {
           setPlans(publicPlans.sort((a, b) => a.days - b.days));
