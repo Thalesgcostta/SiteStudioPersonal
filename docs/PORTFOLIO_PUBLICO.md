@@ -10,7 +10,7 @@ A atualização de outubro usa as **16 fotos de `FotosNovas.zip`**, preservadas 
 | --- | --- | --- |
 | FotoKatielle.jpeg | katielle-apresentacao.jpg | Apresentação “Um espaço menor”, avatar e galeria da personal. Recorte mantém rosto e postura. |
 | Alunos9.jpeg | orientacao-individual.jpg | Foto principal da abertura e galeria. Arquivo de 2336×4160 para o destaque maior. |
-| Estrutura3.jpeg | studio-vista-ampla.jpg | Foto secundária da abertura, capa do vídeo e galeria. Vista horizontal completa. |
+| Estrutura3.jpeg | studio-vista-ampla.jpg | Foto secundária da abertura e galeria; também preservada como capa do vídeo local antigo. Vista horizontal completa. |
 | Alunos10.jpeg | acompanhamento-no-supino.jpg | Item 01 do método e galeria: orientação de um exercício com barra. |
 | Alunos3.jpeg | cuidado-na-maquina.jpg | Item 02 do método e galeria: acompanhamento da postura no aparelho. |
 | Estrutura4.jpeg | studio-iluminacao.jpg | Item 03 do método e galeria: ambiente e estrutura. |
@@ -41,11 +41,17 @@ Todas as seções, o cabeçalho, o menu móvel e o rodapé usam o mesmo fundo es
 
 O contato exibe o endereço **R. Moacir Falaguasta, 2705 - Jardim Tropical, Franca - SP, 14407-061** e incorpora um mapa interativo do Google Maps, carregado quando o visitante se aproxima dessa seção. O endereço é usado também nos links externos do mapa e nos dados estruturados do site. Não é necessária uma chave de API ou configuração adicional no Cloudflare. O mapa depende do serviço e da conexão com o Google Maps; o link externo permanece disponível.
 
-## Vídeo
+## Vídeos do YouTube
 
-O arquivo de `VideoStudio.zip` está em `studio-em-movimento.mp4`: aproximadamente 20 segundos, 1024×576 e 4,2 MB. O áudio e o vídeo originais foram preservados; apenas a organização interna do MP4 foi ajustada para iniciar a reprodução sem baixar o arquivo inteiro (`faststart`). A capa atual `studio-vista-ampla.jpg` mostra a estrutura do studio em formato horizontal.
+A seção **“Um pouco do studio. Muito sobre cuidar.”** apresenta um player maior com borda laranja e três miniaturas com bordas azuis. A seleção inicial usa o vídeo indicado pelo studio, <https://youtu.be/ZsS8bJw2i9k>, e deixa os três outros espaços vazios. Cada miniatura preenchida troca o vídeo do player principal. Há um link permanente para <https://www.youtube.com/@KatielleFaleiros.> e acesso direto ao vídeo no YouTube.
 
-A seção entre o método e a galeria mantém o formato horizontal 16:9. O MP4 só é solicitado após o visitante clicar em reproduzir. Há controles nativos de áudio, pausa e tela cheia, reprodução inline no celular, descrição visual e acesso direto ao arquivo em caso de erro. Não há reprodução automática.
+A seleção é administrada em **gestao.katiellefaleiros.com.br → Configurações → Vídeos do YouTube**, na versão da gestão publicada pela branch `main`. Ela exige a nova migração **202611140010_studio_videos.sql**, disponível na `main`, executada no mesmo Supabase depois da 009. Consulte [`docs/VIDEOS_YOUTUBE.md` na main](https://github.com/Thalesgcostta/SiteStudioPersonal/blob/main/docs/VIDEOS_YOUTUBE.md) para instalação e operação. Não mescle todo o administrativo nessa branch pública para atualizar os vídeos.
+
+O portfólio usa as variáveis públicas de build já utilizadas pelos planos, consulta somente `get_public_studio_videos` e nunca importa a sessão administrativa. Alterações salvas na gestão aparecem ao recarregar o site, sem novo deploy. Não é necessária chave da API do YouTube nem login do canal: a curadoria é manual por links e títulos.
+
+A incorporação em `youtube-nocookie.com` só carrega após clique; as imagens vêm de `i.ytimg.com`. Vídeos privados ou com incorporação bloqueada podem não tocar no site; o link externo permanece disponível. Sem a RPC/configuração ou durante falhas de rede, aparece o vídeo inicial escolhido. Uma seleção salva vazia é respeitada. Os espaços não preenchidos não simulam botões de vídeo.
+
+O MP4 local anterior foi preservado nos assets, mas essa seção não o carrega mais.
 
 ## Rodar localmente
 
@@ -93,6 +99,6 @@ Um arranjo possível é o domínio principal para o portfólio e `admin.seudomin
 
 ## Verificação
 
-Os testes validam as informações, a leitura dos valores, a ausência de chamadas administrativas, o carregamento das fotos reais, filtros e navegação do carrossel, ampliação por teclado, reprodução do MP4 real após clique, tratamento de falha do vídeo, menu mobile, FAQ, WhatsApp, verificações automáticas de acessibilidade e largura de tela em 320 e 390 pixels. A suíte SQL confirma acesso anônimo limitado aos preços e manutenção das permissões administrativas.
+Os testes validam as informações, a leitura dos valores, a ausência de chamadas administrativas, o carregamento das fotos reais, filtros e navegação do carrossel, ampliação por teclado, inserção do player YouTube somente após clique, seleção de vídeos, espaços vazios, falhas da consulta e das miniaturas, menu mobile, FAQ, WhatsApp, verificações automáticas de acessibilidade e largura de tela em 320 e 390 pixels. A suíte SQL confirma acesso anônimo limitado aos preços e manutenção das permissões administrativas.
 
-Somente a API de preços é simulada nos testes de navegador; fotos e vídeo são servidos dos arquivos recebidos. A migração é validada em PostgreSQL local. Esses testes não confirmam instalação no Supabase hospedado nem publicação no Cloudflare.
+As APIs públicas de preços/vídeos, as miniaturas externas e o player YouTube são simulados nos testes de navegador. As fotos do studio continuam sendo servidas dos arquivos recebidos. Os testes verificam URLs e interação do embed, sem comprovar reprodução real no YouTube. A migração é validada em PostgreSQL local. Esses testes não confirmam instalação no Supabase hospedado nem publicação no Cloudflare.

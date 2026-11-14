@@ -17,6 +17,12 @@ const respond = (route: Route, data: unknown, status = 200) =>
     : route.fulfill({ status, json: data, headers: cors });
 test.beforeEach(async ({ page }) => {
   await page.route(api, (route) => respond(route, rates));
+  await page.route("**/rest/v1/rpc/get_public_studio_videos", (route) => respond(route, {
+    version: 0, videos: [{ videoId: "ZsS8bJw2i9k", title: "Um pouco do Studio Katielle Faleiros" }],
+  }));
+  await page.route("https://i.ytimg.com/**", route => route.fulfill({
+    contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="#172c37"/></svg>',
+  }));
 });
 
 test("portfolio mostra informações, preços do banco e contatos sem carregar o administrativo", async ({
@@ -199,63 +205,6 @@ test("fotos reais carregam e a ampliação preserva a imagem inteira", async ({
     )
     .toBe(true);
   expect(failedMedia).toEqual([]);
-});
-
-test("vídeo real só carrega após clique e reproduz em sua proporção original", async ({
-  page,
-}) => {
-  const videoRequests: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().endsWith("studio-em-movimento.mp4"))
-      videoRequests.push(request.url());
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
-  const player = page.locator("video");
-  await page.locator("#em-movimento").scrollIntoViewIfNeeded();
-  expect(await player.getAttribute("src")).toBeNull();
-  expect(await player.getAttribute("autoplay")).toBeNull();
-  expect(videoRequests).toEqual([]);
-  await page
-    .getByRole("button", { name: "Reproduzir vídeo do studio", exact: true })
-    .click();
-  await expect
-    .poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime))
-    .toBeGreaterThan(0);
-  const playback = await player.evaluate((video: HTMLVideoElement) => {
-    video.pause();
-    return {
-      width: video.videoWidth,
-      height: video.videoHeight,
-      duration: video.duration,
-      controls: video.controls,
-      inline: video.playsInline,
-    };
-  });
-  expect(playback).toMatchObject({
-    width: 1024,
-    height: 576,
-    controls: true,
-    inline: true,
-  });
-  expect(playback.duration).toBeCloseTo(20, 0);
-  expect(videoRequests.length).toBeGreaterThan(0);
-  const frame = await page.locator(".video-frame").boundingBox();
-  expect(frame!.width / frame!.height).toBeCloseTo(16 / 9, 1);
-});
-
-test("falha de vídeo oferece acesso direto ao arquivo", async ({ page }) => {
-  await page.route("**/studio-em-movimento.mp4", (route) => route.abort());
-  await page.goto("/");
-  await page
-    .getByRole("button", { name: "Reproduzir vídeo do studio", exact: true })
-    .click();
-  await expect(page.locator(".video-error")).toContainText(
-    "Não foi possível carregar o vídeo",
-  );
-  await expect(
-    page.getByRole("link", { name: "Abrir o vídeo diretamente" }),
-  ).toHaveAttribute("href", "/media/studio-em-movimento.mp4");
 });
 
 test("falha ou resposta inválida dos planos mantém preços sob consulta", async ({

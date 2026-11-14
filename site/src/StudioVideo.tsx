@@ -1,102 +1,96 @@
 import { useRef, useState } from "react";
-import { ArrowUpRight, Play } from "lucide-react";
-import { studioVideo, whatsappLink } from "./content";
+import { ArrowUpRight, Play, Youtube } from "lucide-react";
+import { channelUrl, useStudioVideos } from "./useStudioVideos";
+import type { ChannelVideo } from "./useStudioVideos";
+import "./studio-videos.css";
+
+function Thumbnail({ video }: { video: ChannelVideo }) {
+  const [failed, setFailed] = useState(false);
+  return failed ? <span className="channel-image-fallback" aria-hidden="true">KF</span> : (
+    <img src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`} alt="" loading="lazy"
+      width={480} height={360} referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+  );
+}
 
 export function StudioVideo() {
-  const video = useRef<HTMLVideoElement>(null);
-  const [started, setStarted] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const play = () => {
-    const player = video.current;
-    if (!player) return;
-    // Só atribuímos a mídia após o clique: a visita não baixa o MP4.
-    player.src = studioVideo.src;
-    player.controls = true;
-    setStarted(true);
-    void player.play().catch(() => {
-      // Os controles nativos permitem tentar novamente se o navegador pausar.
-    });
-  };
-
+  const { videos, loading } = useStudioVideos();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const player = useRef<HTMLDivElement>(null);
+  const selected = videos.find(v => v.videoId === selectedId) || videos[0];
+  const suggestions = videos.filter(v => v.videoId !== selected?.videoId);
+  const watchUrl = selected ? `https://www.youtube.com/watch?v=${selected.videoId}` : channelUrl;
   return (
-    <section
-      id="em-movimento"
-      className="video-section"
-      aria-labelledby="video-heading"
-    >
+    <section id="em-movimento" className="video-section channel-section" aria-labelledby="video-heading">
       <div className="container">
         <div className="video-heading">
           <div>
-            <span className="eyebrow">DÊ O PLAY. SINTA O AMBIENTE.</span>
-            <h2 id="video-heading">
-              Um pouco do studio.
-              <br />
-              <em>Muito sobre cuidar.</em>
-            </h2>
+            <span className="eyebrow">DO STUDIO PARA O SEU DIA.</span>
+            <h2 id="video-heading">Um pouco do studio.<br /><em>Muito sobre cuidar.</em></h2>
           </div>
-          <p>
-            Conheça o espaço, os treinos e o acompanhamento que faz parte dos
-            nossos dias. Depois, venha viver essa experiência de perto.
-          </p>
+          <p>Movimento, orientação e cuidado também em vídeo. Dê o play e conheça mais de perto o nosso jeito de treinar.</p>
         </div>
-        <figure className="studio-film">
-          <div className="video-frame">
-            <video
-              ref={video}
-              width={studioVideo.width}
-              height={studioVideo.height}
-              poster={studioVideo.poster}
-              preload="none"
-              playsInline
-              controls={started}
-              aria-label="Vídeo do Studio de Personal Katielle Faleiros"
-              aria-describedby="video-description"
-              onError={() => setFailed(true)}
-            >
-              Seu navegador não consegue reproduzir este vídeo.
-            </video>
-            {!started && (
-              <button
-                className="video-start"
-                type="button"
-                aria-label="Reproduzir vídeo do studio"
-                onClick={play}
-              >
-                <span className="video-play-icon">
-                  <Play size={30} fill="currentColor" aria-hidden="true" />
-                </span>
-                <span>Conheça o studio em 20 segundos</span>
-              </button>
-            )}
+        <div className="channel-bar">
+          <div className="channel-identity">
+            <span className="channel-avatar" aria-hidden="true">K<span>F</span></span>
+            <div><strong>Katielle Faleiros</strong><span>O nosso cuidado, em cada vídeo.</span></div>
           </div>
-          <figcaption className="video-caption">
-            <span>
-              <span className="status-dot" /> É AQUI QUE ACONTECE.
-            </span>
-            <a
-              className="text-link"
-              href={whatsappLink()}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Quero conhecer de perto{" "}
-              <ArrowUpRight size={17} aria-hidden="true" />
-            </a>
-          </figcaption>
-        </figure>
-        <p id="video-description" className="video-description">
-          No vídeo, Katielle orienta alunos nos exercícios e a câmera percorre
-          os aparelhos e a iluminação do studio. As cenas destacam o
-          acompanhamento personalizado, a segurança e o convite para uma aula
-          experimental.
-        </p>
-        {failed && (
-          <p className="video-error" role="status">
-            Não foi possível carregar o vídeo.{" "}
-            <a href={studioVideo.src}>Abrir o vídeo diretamente</a>.
-          </p>
-        )}
+          <a className="channel-link" href={channelUrl} target="_blank" rel="noopener noreferrer">
+            <Youtube size={20} aria-hidden="true" /> Explorar o canal <ArrowUpRight size={17} aria-hidden="true" />
+          </a>
+        </div>
+        <div className="channel-layout" aria-busy={loading}>
+          <div className="channel-feature">
+            <div className="channel-player" ref={player} tabIndex={-1} role="group" aria-label="Vídeo em destaque">
+              {selected ? playingId === selected.videoId ? (
+                <iframe key={selected.videoId} title={`YouTube: ${selected.title}`}
+                  src={`https://www.youtube-nocookie.com/embed/${selected.videoId}?autoplay=1&rel=0&playsinline=1`}
+                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin" />
+              ) : (
+                <button type="button" className="channel-play" aria-label={`Reproduzir ${selected.title}`}
+                  onClick={() => setPlayingId(selected.videoId)}>
+                  <Thumbnail key={selected.videoId} video={selected} />
+                  <span className="channel-feature-tag"><Youtube size={16} aria-hidden="true" /> NO CANAL DA KATIELLE</span>
+                  <span className="channel-play-icon"><Play size={32} fill="currentColor" aria-hidden="true" /></span>
+                  <span className="channel-play-label">Dê o play. Venha conhecer.</span>
+                </button>
+              ) : (
+                <div className="channel-no-video"><Youtube size={44} aria-hidden="true" /><p>Novas histórias de cuidado vêm por aí.</p><a href={channelUrl} target="_blank" rel="noopener noreferrer">Conhecer o canal <ArrowUpRight size={17} /></a></div>
+              )}
+            </div>
+            <div className="channel-feature-caption">
+              <span className="channel-kicker">{playingId === selected?.videoId ? "AGORA NO PLAYER" : "EM DESTAQUE"}</span>
+              <h3>{selected?.title || "Nosso próximo encontro é no YouTube."}</h3>
+              <a href={watchUrl} target="_blank" rel="noopener noreferrer">{selected ? "Assistir no YouTube" : "Visitar o canal"} <ArrowUpRight size={16} aria-hidden="true" /></a>
+            </div>
+          </div>
+          <aside className="channel-more" aria-labelledby="channel-more-heading">
+            <div className="channel-more-heading"><h3 id="channel-more-heading">Mais do nosso canal</h3><span>CONTINUE EXPLORANDO</span></div>
+            <ol className="channel-list">
+              {Array.from({ length: 3 }, (_, index) => {
+                const video = suggestions[index];
+                return <li key={video?.videoId || `empty-${index}`}>
+                  {video ? (
+                    <button className="channel-suggestion" type="button" aria-label={`Assistir ${video.title}`}
+                      onClick={() => { setSelectedId(video.videoId); setPlayingId(video.videoId); player.current?.focus(); }}>
+                      <span className="channel-miniature"><Thumbnail key={video.videoId} video={video} /><span className="channel-mini-play"><Play size={17} fill="currentColor" aria-hidden="true" /></span></span>
+                      <span className="channel-suggestion-copy"><small>NO CANAL</small><strong>{video.title}</strong><span>Assistir agora <ArrowUpRight size={14} aria-hidden="true" /></span></span>
+                    </button>
+                  ) : (
+                    <div className="channel-empty" aria-label="Espaço para um próximo vídeo">
+                      <span className="channel-miniature"><Youtube size={27} aria-hidden="true" /></span>
+                      <span className="channel-suggestion-copy"><small>EM BREVE</small><strong>Mais movimento por aqui.</strong><span>Um espaço para novas histórias.</span></span>
+                    </div>
+                  )}
+                </li>;
+              })}
+            </ol>
+            <p className="channel-more-note">Treine com atenção.<br /><span>Leve esse cuidado com você.</span></p>
+          </aside>
+        </div>
+        {selected && <p className="channel-player-note">O vídeo carrega ao dar play. Prefere abrir no aplicativo? <a href={watchUrl} target="_blank" rel="noopener noreferrer">Assista pelo YouTube <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
+        <span className="sr-only" role="status">{selected ? `Vídeo selecionado: ${selected.title}` : "Nenhum vídeo selecionado."}</span>
       </div>
     </section>
   );
