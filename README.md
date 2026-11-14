@@ -25,6 +25,8 @@ O portfólio público é publicado pela branch `feat/public-portfolio`. Esta bra
 
 ## Desenvolvimento
 
+Para escolher os vídeos exibidos no portfólio, use **Configurações → Vídeos do YouTube**. A edição requer a [migração 010 e as instruções de vídeos](docs/VIDEOS_YOUTUBE.md).
+
 Requisitos: Node.js 22 ou superior e npm. Dentro da pasta do projeto:
 
 ```sh

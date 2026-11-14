@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   RotateCcw,
   ShieldCheck,
+  Youtube,
 } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -17,6 +18,7 @@ import { useStudio } from "../context";
 import { currency, methods } from "../data";
 import { displaySizes } from "../lib/useDisplaySettings";
 import type { DisplayScale } from "../lib/useDisplaySettings";
+import { StudioVideos } from "./StudioVideos";
 import {
   ProductCategories,
   DashboardSettings,
@@ -115,6 +117,7 @@ export function Settings() {
             { id: "profile", title: "Meu perfil", icon: UserRound },
             { id: "categories", title: "Categorias de produtos", icon: Tags },
             { id: "dashboard", title: "Dashboard", icon: LayoutDashboard },
+            { id: "videos", title: "Vídeos do YouTube", icon: Youtube },
           ].map((t) => (
             <button
               key={t.id}
@@ -126,7 +129,9 @@ export function Settings() {
             </button>
           ))}
         </nav>
-        {tab === "profile" ? (
+        {tab === "videos" ? (
+          <StudioVideos />
+        ) : tab === "profile" ? (
           <UserProfile />
         ) : tab === "display" ? (
           <Panel

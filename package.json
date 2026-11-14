@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "npm run test:database && npm run test:ui && npm run test:integration",
-    "test:database": "node --test tests/database.test.mjs",
+    "test:database": "node --test tests/database.test.mjs tests/studio-videos.test.mjs",
     "test:ui": "playwright test --project=demo",
     "test:integration": "playwright test --project=supabase"
   },

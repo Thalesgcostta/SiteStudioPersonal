@@ -5252,3 +5252,129 @@ td > div > small,
   z-index: 1;
   background: #fff;
 }
+.studio-videos-editor {
+  min-width: 0;
+}
+.studio-videos-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f2f7f9;
+  border-left: 3px solid #579aba;
+}
+.studio-videos-guide > svg {
+  flex-shrink: 0;
+  color: #bd4b00;
+}
+.studio-videos-guide p {
+  margin: 6px 0 10px;
+  line-height: 1.7;
+  color: #586879;
+}
+.studio-videos-guide a,
+.studio-video-thumbnail a > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.studio-videos-guide a {
+  color: #25617e;
+  font-weight: 600;
+}
+.studio-videos-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 20px 0;
+  list-style: none;
+}
+.studio-video-item {
+  min-width: 0;
+  border: 1px solid #579aba;
+  border-radius: 12px;
+  padding: 16px;
+}
+.studio-video-item.is-featured {
+  border-color: #ff6800;
+}
+.studio-video-item-heading,
+.studio-video-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.studio-video-item-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.studio-video-item-heading > strong {
+  color: #354452;
+  font-size: 14px;
+}
+.studio-video-item-body {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+.studio-video-thumbnail {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #0b1013;
+  color: #e7eff3;
+}
+.studio-video-thumbnail > a,
+.studio-video-thumbnail > span {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.studio-video-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.studio-video-thumbnail a > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 7px;
+  justify-content: center;
+  color: #fff;
+  background: rgb(0 0 0 / 80%);
+}
+.studio-video-inputs {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.studio-video-inputs input {
+  min-width: 0;
+  width: 100%;
+}
+.studio-videos-error .button {
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .studio-video-item-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-video-thumbnail {
+    width: min(100%, 280px);
+  }
+  .studio-videos-guide {
+    padding: 14px;
+  }
+}
