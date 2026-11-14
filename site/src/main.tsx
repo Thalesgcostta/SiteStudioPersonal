@@ -8,13 +8,17 @@ import "@fontsource/inter/latin-600-italic.css";
 import "@fontsource/inter/latin-700.css";
 import App from "./App";
 import { MotionPreferenceProvider } from "./MotionPreference";
+import { PresentationProvider } from "./Presentation";
 import "./styles.css";
 import "./hero/hero.css";
+import "./presentation.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <MotionPreferenceProvider>
-      <App />
+      <PresentationProvider>
+        <App />
+      </PresentationProvider>
     </MotionPreferenceProvider>
   </React.StrictMode>,
 );

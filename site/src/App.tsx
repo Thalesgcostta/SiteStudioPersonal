@@ -18,6 +18,7 @@ import { StudioVideo } from "./StudioVideo";
 import { mapEmbedUrl, mapUrl, photos, studio, whatsappLink } from "./content";
 import { BrandMark, StudioPhoto } from "./StudioPhoto";
 import { publicPlanDays, usePublicPlans } from "./usePublicPlans";
+import { PresentationSwitch, usePresentation } from "./Presentation";
 
 function TrialLink({
   className = "",
@@ -101,6 +102,26 @@ function Header() {
   );
 }
 function About() {
+  const { compact } = usePresentation();
+  const story = (
+    <>
+      <p>
+        No Studio de Personal Katielle Faleiros, em Franca, o treinamento
+        começa com uma pessoa: você.
+      </p>
+      <p>
+        Katielle é profissional de educação física e tem mais de 15 anos de
+        experiência. Seu trabalho une treinos individualizados, correção
+        próxima dos movimentos e cuidado com os objetivos de cada aluno.
+      </p>
+    </>
+  );
+  const signature = (
+    <div className="signature">
+      <span>Katielle Faleiros</span>
+      <small>Profissional de educação física</small>
+    </div>
+  );
   return (
     <section
       id="studio"
@@ -127,15 +148,15 @@ function About() {
             <br />
             <em>Uma atenção maior.</em>
           </h2>
-          <p>
-            No Studio de Personal Katielle Faleiros, em Franca, o treinamento
-            começa com uma pessoa: você.
-          </p>
-          <p>
-            Katielle é profissional de educação física e tem mais de 15 anos de
-            experiência. Seu trabalho une treinos individualizados, correção
-            próxima dos movimentos e cuidado com os objetivos de cada aluno.
-          </p>
+          {compact ? (
+            <>
+              <p>Treino personalizado em Franca, com a atenção de Katielle e mais de 15 anos de experiência.</p>
+              <details className="compact-details about-story">
+                <summary>Conheça a história da Katielle <ChevronDown size={18} aria-hidden="true" /></summary>
+                <div className="compact-details-content">{story}{signature}</div>
+              </details>
+            </>
+          ) : story}
           <div className="about-values">
             <span>
               <Check size={18} />
@@ -150,10 +171,7 @@ function About() {
               Saúde e qualidade de vida
             </span>
           </div>
-          <div className="signature">
-            <span>Katielle Faleiros</span>
-            <small>Profissional de educação física</small>
-          </div>
+          {!compact && signature}
           <a
             className="text-link light-link"
             href={studio.instagram}
@@ -168,6 +186,7 @@ function About() {
   );
 }
 function Method() {
+  const { compact } = usePresentation();
   const [selected, setSelected] = useState(0);
   const features = [
     {
@@ -175,6 +194,7 @@ function Method() {
       icon: Target,
       title: "O seu objetivo guia o treino.",
       text: "Treinos individualizados e personalizados, pensados para o seu ritmo e para o que faz sentido na sua rotina.",
+      shortText: "Um treino pensado para você.",
       photo: photos.barTraining,
       caption: "Seu objetivo. Nossa orientação.",
     },
@@ -183,6 +203,7 @@ function Method() {
       icon: HeartPulse,
       title: "Atenção em cada movimento.",
       text: "Correção próxima, técnica e segurança. Um ambiente para evoluir com acompanhamento e cuidar da sua qualidade de vida.",
+      shortText: "Orientação próxima, técnica e segurança.",
       photo: photos.machineCare,
       caption: "Presença e cuidado em cada repetição.",
     },
@@ -191,6 +212,7 @@ function Method() {
       icon: ScanLine,
       title: "Cuidado que olha o todo.",
       text: "Avaliações por bioimpedância para acompanhar sua composição corporal e observar sua evolução ao longo dos treinos.",
+      shortText: "Bioimpedância para acompanhar sua evolução.",
       photo: photos.ambient,
       caption: "Um espaço pensado para cuidar de você.",
     },
@@ -209,8 +231,7 @@ function Method() {
           <em>de uma ficha de treino.</em>
         </h2>
         <p>
-          Menor circulação de pessoas e uma orientação próxima para você treinar
-          com confiança.
+          {compact ? "Menos pessoas. Mais atenção ao seu treino." : "Menor circulação de pessoas e uma orientação próxima para você treinar com confiança."}
         </p>
       </div>
       <div className="method-layout">
@@ -254,7 +275,7 @@ function Method() {
                     <item.icon size={23} aria-hidden="true" />
                     <span>{item.title}</span>
                   </span>
-                  <span className="feature-description">{item.text}</span>
+                  <span className="feature-description">{compact ? item.shortText : item.text}</span>
                 </span>
                 <ArrowUpRight
                   className="feature-arrow"
@@ -264,6 +285,14 @@ function Method() {
               </button>
             ))}
           </div>
+          {compact && (
+            <details className="compact-details method-details">
+              <summary>Mais sobre nosso cuidado <ChevronDown size={18} aria-hidden="true" /></summary>
+              <div className="compact-details-content">
+                {features.map(item => <div key={item.number}><h3>{item.title}</h3><p>{item.text}</p></div>)}
+              </div>
+            </details>
+          )}
           <a
             className="method-contact text-link"
             href={whatsappLink(
@@ -280,6 +309,7 @@ function Method() {
   );
 }
 function Plans() {
+  const { compact } = usePresentation();
   const { plans, status } = usePublicPlans();
   const currency = (amount: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -304,8 +334,7 @@ function Plans() {
             </h2>
           </div>
           <p>
-            Escolha a frequência que combina com a sua rotina. O acompanhamento
-            personalizado faz parte de cada plano.
+            {compact ? "Todos os planos incluem treino individualizado e acompanhamento próximo. Escolha seus dias." : "Escolha a frequência que combina com a sua rotina. O acompanhamento personalizado faz parte de cada plano."}
           </p>
         </div>
         <div className="plan-grid" aria-busy={status === "loading"}>
@@ -326,7 +355,7 @@ function Plans() {
                       : "Consulte"}
                   {plan && <span>/mês</span>}
                 </p>
-                <p className="plan-description">
+                {!compact && <p className="plan-description">
                   {
                     [
                       "Presença na rotina.",
@@ -336,7 +365,7 @@ function Plans() {
                       "Uma semana completa de cuidado.",
                     ][days - 2]
                   }
-                </p>
+                </p>}
                 <ul>
                   <li>
                     <Check size={16} />
@@ -379,6 +408,7 @@ function Plans() {
   );
 }
 function Questions() {
+  const { compact } = usePresentation();
   return (
     <section
       className="questions-section container"
@@ -392,8 +422,7 @@ function Questions() {
           <em>A gente conversa.</em>
         </h2>
         <p>
-          Cada começo é diferente. Tire suas dúvidas e venha conhecer o nosso
-          jeito de cuidar.
+          {compact ? "Suas dúvidas antes de começar." : "Cada começo é diferente. Tire suas dúvidas e venha conhecer o nosso jeito de cuidar."}
         </p>
       </div>
       <div className="questions-list">
@@ -424,6 +453,7 @@ function Questions() {
   );
 }
 function Contact() {
+  const { compact } = usePresentation();
   return (
     <section
       id="contato"
@@ -439,8 +469,7 @@ function Contact() {
             <em>uma aula gratuita.</em>
           </h2>
           <p>
-            Conheça o studio. Sinta a diferença de treinar com alguém que olha
-            para você. A gente te espera em Franca.
+            {compact ? "Venha conhecer o studio em Franca. Agende pelo WhatsApp." : "Conheça o studio. Sinta a diferença de treinar com alguém que olha para você. A gente te espera em Franca."}
           </p>
           <TrialLink className="contact-cta">
             Agendar aula experimental gratuita
@@ -492,39 +521,57 @@ function Contact() {
             </a>
           </div>
         </div>
-        <div className="contact-map">
-          <div className="map-frame">
-            <iframe
-              title="Localização do Studio Katielle Faleiros em Franca"
-              src={mapEmbedUrl}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              allowFullScreen
-            />
-          </div>
-          <div className="map-caption">
-            <p>
-              <MapPin size={19} aria-hidden="true" />
-              <span>
-                {studio.street}
-                <small>
-                  {studio.neighborhood} · Franca, SP · {studio.postalCode}
-                </small>
-              </span>
-            </p>
-            <a href={mapUrl} target="_blank" rel="noopener noreferrer">
-              Ver localização <ArrowUpRight size={18} />
-            </a>
-          </div>
-        </div>
+        {compact ? <CompactMap /> : <StudioMap />}
       </div>
     </section>
+  );
+}
+function CompactMap() {
+  const [opened, setOpened] = useState(false);
+  return (
+    <details
+      className="compact-details compact-map"
+      onToggle={event => setOpened(event.currentTarget.open)}
+    >
+      <summary>Ver mapa do studio <ChevronDown size={18} aria-hidden="true" /></summary>
+      {opened && <StudioMap />}
+    </details>
+  );
+}
+function StudioMap() {
+  return (
+    <div className="contact-map">
+      <div className="map-frame">
+        <iframe
+          title="Localização do Studio Katielle Faleiros em Franca"
+          src={mapEmbedUrl}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
+      </div>
+      <div className="map-caption">
+        <p>
+          <MapPin size={19} aria-hidden="true" />
+          <span>
+            {studio.street}
+            <small>
+              {studio.neighborhood} · Franca, SP · {studio.postalCode}
+            </small>
+          </span>
+        </p>
+        <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+          Ver localização <ArrowUpRight size={18} />
+        </a>
+      </div>
+    </div>
   );
 }
 export default function App() {
   return (
     <>
       <Header />
+      <PresentationSwitch />
       <main id="conteudo" tabIndex={-1}>
         <Hero />
         <About />
@@ -551,6 +598,7 @@ export default function App() {
           <span>Franca, SP · Movimento com atenção.</span>
           <p>© {new Date().getFullYear()} Studio Katielle Faleiros</p>
         </div>
+        <PresentationSwitch placement="footer" />
       </footer>
       <aside className="floating-contact" aria-label="Contato rápido">
         <a

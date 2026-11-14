@@ -53,6 +53,16 @@ A incorporação em `youtube-nocookie.com` só carrega após clique; as imagens 
 
 O MP4 local anterior foi preservado nos assets, mas essa seção não o carrega mais.
 
+## Apresentação para smartphones
+
+Até **767 px de largura**, o site abre em uma apresentação compacta: textos mais curtos, história da Katielle e explicação do método expansíveis, galeria menor e planos com os valores/condições essenciais. Os três espaços de vídeos ainda não preenchidos ficam lado a lado, sem repetir textos. O mapa só é inserido quando o visitante abre **Ver mapa do studio**; o endereço e o link externo permanecem visíveis.
+
+A logo KF com os três anéis animados, os cartões de métricas ilustrativas, a foto e os controles de pausa/retomada continuam na abertura. A animação inicia como antes; a paralaxe não responde a gestos de toque. O bloco repetido “Katielle Faleiros — O nosso cuidado, em cada vídeo” foi removido da seção de vídeos em todas as telas.
+
+Os botões **Ver versão desktop** (no topo e no rodapé) mostram todo o conteúdo da apresentação completa, mantendo o layout legível na largura do celular. **Voltar à versão celular** restaura a apresentação compacta. A escolha é salva localmente quando o navegador permite; a alternância funciona durante a visita mesmo se o armazenamento estiver bloqueado. Em telas a partir de **768 px**, o conteúdo completo sempre aparece. Ao voltar para uma largura de smartphone, a preferência anterior é respeitada. Alternar a apresentação não recarrega a página nem reinicia o player de vídeo ou a escolha de pausa das animações.
+
+Essa apresentação usa o mesmo site e as mesmas consultas públicas, sem alterar a gestão ou exigir nova migração SQL.
+
 ## Rodar localmente
 
 Na raiz do repositório:

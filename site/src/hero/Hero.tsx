@@ -6,6 +6,7 @@ import { PerformanceScene } from "./PerformanceScene";
 import { illustrativePerformance } from "./metrics";
 import type { PerformanceSnapshot } from "./metrics";
 import { useHeroParallax } from "./useHeroParallax";
+import { usePresentation } from "../Presentation";
 
 export function Hero({
   metrics = illustrativePerformance,
@@ -13,6 +14,7 @@ export function Hero({
   metrics?: PerformanceSnapshot;
 }) {
   const motion = useHeroParallax();
+  const { compact } = usePresentation();
   const [paused, setPaused] = useState(false);
   return (
     <LazyMotion features={domAnimation} strict>
@@ -38,8 +40,7 @@ export function Hero({
               <em>Seu melhor.</em>
             </h1>
             <p>
-              Treino intenso. Cuidado de perto. Uma experiência personalizada
-              para transformar movimento em qualidade de vida.
+              {compact ? "Treino personalizado. Atenção de perto. Mais qualidade de vida." : "Treino intenso. Cuidado de perto. Uma experiência personalizada para transformar movimento em qualidade de vida."}
             </p>
             <div className="hero-actions">
               <a

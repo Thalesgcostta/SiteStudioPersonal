@@ -10,8 +10,10 @@ import {
 import { gallery } from "./content";
 import { useGalleryAutoplay } from "./useGalleryAutoplay";
 import { StudioPhoto } from "./StudioPhoto";
+import { usePresentation } from "./Presentation";
 
 export function Gallery() {
+  const { compact } = usePresentation();
   const [category, setCategory] = useState("Todos");
   const [position, setPosition] = useState(0);
   const [canNext, setCanNext] = useState(true);
@@ -122,8 +124,7 @@ export function Gallery() {
           </h2>
         </div>
         <p>
-          Um olhar para os nossos dias: movimento, orientação e um espaço para
-          se sentir à vontade.
+          {compact ? "Nosso dia a dia, de perto." : "Um olhar para os nossos dias: movimento, orientação e um espaço para se sentir à vontade."}
         </p>
       </div>
       <div className="container gallery-toolbar">

@@ -3,6 +3,7 @@ import { ArrowUpRight, Play, Youtube } from "lucide-react";
 import { channelUrl, useStudioVideos } from "./useStudioVideos";
 import type { ChannelVideo } from "./useStudioVideos";
 import "./studio-videos.css";
+import { usePresentation } from "./Presentation";
 
 function Thumbnail({ video }: { video: ChannelVideo }) {
   const [failed, setFailed] = useState(false);
@@ -14,6 +15,7 @@ function Thumbnail({ video }: { video: ChannelVideo }) {
 
 export function StudioVideo() {
   const { videos, loading } = useStudioVideos();
+  const { compact } = usePresentation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const player = useRef<HTMLDivElement>(null);
@@ -28,13 +30,9 @@ export function StudioVideo() {
             <span className="eyebrow">DO STUDIO PARA O SEU DIA.</span>
             <h2 id="video-heading">Um pouco do studio.<br /><em>Muito sobre cuidar.</em></h2>
           </div>
-          <p>Movimento, orientação e cuidado também em vídeo. Dê o play e conheça mais de perto o nosso jeito de treinar.</p>
+          <p>{compact ? "Dê o play. Conheça nosso jeito de cuidar." : "Movimento, orientação e cuidado também em vídeo. Dê o play e conheça mais de perto o nosso jeito de treinar."}</p>
         </div>
         <div className="channel-bar">
-          <div className="channel-identity">
-            <span className="channel-avatar" aria-hidden="true">K<span>F</span></span>
-            <div><strong>Katielle Faleiros</strong><span>O nosso cuidado, em cada vídeo.</span></div>
-          </div>
           <a className="channel-link" href={channelUrl} target="_blank" rel="noopener noreferrer">
             <Youtube size={20} aria-hidden="true" /> Explorar o canal <ArrowUpRight size={17} aria-hidden="true" />
           </a>
@@ -78,7 +76,7 @@ export function StudioVideo() {
                       <span className="channel-suggestion-copy"><small>NO CANAL</small><strong>{video.title}</strong><span>Assistir agora <ArrowUpRight size={14} aria-hidden="true" /></span></span>
                     </button>
                   ) : (
-                    <div className="channel-empty" aria-label="Espaço para um próximo vídeo">
+                    <div className="channel-empty" role="group" aria-label="Espaço para um próximo vídeo">
                       <span className="channel-miniature"><Youtube size={27} aria-hidden="true" /></span>
                       <span className="channel-suggestion-copy"><small>EM BREVE</small><strong>Mais movimento por aqui.</strong><span>Um espaço para novas histórias.</span></span>
                     </div>
@@ -89,7 +87,7 @@ export function StudioVideo() {
             <p className="channel-more-note">Treine com atenção.<br /><span>Leve esse cuidado com você.</span></p>
           </aside>
         </div>
-        {selected && <p className="channel-player-note">O vídeo carrega ao dar play. Prefere abrir no aplicativo? <a href={watchUrl} target="_blank" rel="noopener noreferrer">Assista pelo YouTube <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
+        {selected && <p className="channel-player-note">{compact ? "Prefere o aplicativo? " : "O vídeo carrega ao dar play. Prefere abrir no aplicativo? "}<a href={watchUrl} target="_blank" rel="noopener noreferrer">Assista pelo YouTube <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
         <span className="sr-only" role="status">{selected ? `Vídeo selecionado: ${selected.title}` : "Nenhum vídeo selecionado."}</span>
       </div>
     </section>
