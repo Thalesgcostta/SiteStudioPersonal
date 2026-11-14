@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { mockYoutube } from "./youtube-fixture";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -19,15 +20,13 @@ const mobileButton = (page: Page) => page.getByRole("button", { name: "Voltar à
 const mode = (page: Page) => page.locator("html");
 
 test.beforeEach(async ({ page }) => {
+  await mockYoutube(page);
   await page.route("**/rest/v1/rpc/get_public_studio_plans", route => respond(route,
     [220, 280, 360, 420, 600].map((monthlyPrice, index) => ({ days: index + 2, monthlyPrice }))));
   await page.route("**/rest/v1/rpc/get_public_studio_videos", route => respond(route, selection));
   await page.route("https://i.ytimg.com/**", route => route.fulfill({
     contentType: "image/svg+xml",
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="#172c37"/></svg>',
-  }));
-  await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({
-    contentType: "text/html", body: "<!doctype html><title>Player simulado</title><p>Vídeo externo simulado.</p>",
   }));
   await page.route("https://www.google.com/maps/**", route => route.fulfill({
     contentType: "text/html", body: "<!doctype html><title>Mapa simulado</title><p>Mapa externo simulado.</p>",
@@ -40,6 +39,9 @@ for (const width of [320, 390]) {
     await page.goto("/");
     await expect(mode(page)).toHaveAttribute("data-presentation", "compact");
     await expect(desktopButton(page)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ver versão desktop", exact: true })).toHaveCount(1);
+    await expect(page.locator(".site-footer .presentation-switch-footer")).toHaveCount(1);
+    await expect(page.locator(".presentation-switch-top")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
     await expect(page.locator(".hero-visual")).toBeVisible();
     await expect(page.locator(".hero-brand")).toHaveCSS("opacity", "1");
@@ -82,6 +84,46 @@ test("alternar para desktop restaura conteúdo completo e preserva a escolha ao 
   await page.reload();
   await expect(mode(page)).toHaveAttribute("data-presentation", "compact");
 });
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+  test(`imagem e três opções do método ficam juntas em ${viewport.width}×${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const image = page.locator(".method-photo");
+    const options = page.getByRole("group", { name: "Conheça nosso cuidado" });
+    const buttons = options.getByRole("button");
+    await expect(buttons).toHaveCount(3);
+    await image.evaluate(el => {
+      const header = document.querySelector(".site-header")!.getBoundingClientRect().height;
+      window.scrollBy({ top: el.getBoundingClientRect().top - header - 12, behavior: "instant" });
+    });
+    const initialScroll = await page.evaluate(() => scrollY);
+    await buttons.nth(2).click();
+    await expect(buttons.nth(2)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".method-photo-layer.is-active img")).toHaveAttribute("src", "/media/studio-iluminacao.jpg");
+    await expect(page.locator(".method-photo-layer.is-active")).toHaveCSS("opacity", "1");
+    await expect(buttons.nth(2)).toHaveCSS("border-top-color", "rgb(255, 104, 0)");
+    const bounds = await page.evaluate(() => {
+      const photo = document.querySelector(".method-photo")!.getBoundingClientRect();
+      const cards = [...document.querySelectorAll(".method-options button")].map(el => el.getBoundingClientRect());
+      return { headerBottom: document.querySelector(".site-header")!.getBoundingClientRect().bottom,
+        photoTop: photo.top, photoBottom: photo.bottom, cards: cards.map(card => ({ top: card.top, bottom: card.bottom, height: card.height })), viewportHeight: innerHeight, scroll: scrollY };
+    });
+    expect(bounds.photoTop).toBeGreaterThanOrEqual(bounds.headerBottom);
+    expect(bounds.photoBottom).toBeLessThanOrEqual(bounds.viewportHeight);
+    for (const card of bounds.cards) {
+      expect(card.top).toBeGreaterThanOrEqual(bounds.headerBottom);
+      expect(card.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
+      expect(card.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(bounds.scroll).toBeCloseTo(initialScroll, 0);
+    await buttons.nth(0).focus();
+    await page.keyboard.press("Enter");
+    await expect(buttons.nth(0)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".method-photo-layer.is-active img")).toHaveAttribute("src", "/media/acompanhamento-no-supino.jpg");
+    await page.screenshot({ path: `/tmp/kf-method-visible-${viewport.width}.png` });
+  });
+}
 
 test("telas maiores usam todo o conteúdo e rotação restaura preferência do celular", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

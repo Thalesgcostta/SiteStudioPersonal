@@ -47,13 +47,13 @@ export function usePresentation() {
   return value;
 }
 
-export function PresentationSwitch({ placement = "top" }: { placement?: "top" | "footer" }) {
+export function PresentationSwitch() {
   const { compact, smartphone, choose } = usePresentation();
   if (!smartphone) return null;
-  const description = `presentation-description-${placement}`;
+  const description = "presentation-description-footer";
   return (
-    <aside className={`container presentation-switch presentation-switch-${placement}`}
-      aria-label={placement === "top" ? "Visualização do site" : "Visualização do site no rodapé"}>
+    <aside className="container presentation-switch presentation-switch-footer"
+      aria-label="Visualização do site no rodapé">
       <div>
         <span className="presentation-label">{compact ? "ESSENCIAL. DO SEU JEITO." : "CADA DETALHE DO STUDIO."}</span>
         <p id={description}>{compact ? "Uma versão leve para o celular." : "Conteúdo de desktop, ajustado à sua tela."}</p>

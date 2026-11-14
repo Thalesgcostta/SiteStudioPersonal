@@ -1,9 +1,12 @@
 import { useRef, useState } from "react";
-import { ArrowUpRight, Play, Youtube } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ArrowUpRight, Pause, Play, Volume2, VolumeX, Youtube } from "lucide-react";
+import type { RefObject } from "react";
 import { channelUrl, useStudioVideos } from "./useStudioVideos";
 import type { ChannelVideo } from "./useStudioVideos";
 import "./studio-videos.css";
 import { usePresentation } from "./Presentation";
+import { useYoutubePlayback } from "./useYoutubePlayback";
 
 function Thumbnail({ video }: { video: ChannelVideo }) {
   const [failed, setFailed] = useState(false);
@@ -13,11 +16,56 @@ function Thumbnail({ video }: { video: ChannelVideo }) {
   );
 }
 
+function ChannelPlayer({ video, target, manualStart, allowAutomatic, controlsTarget }: {
+  video: ChannelVideo;
+  target: RefObject<HTMLDivElement | null>;
+  manualStart: boolean;
+  allowAutomatic: boolean;
+  controlsTarget: HTMLDivElement | null;
+}) {
+  const playback = useYoutubePlayback({ videoId: video.videoId, title: video.title, target, manualStart, allowAutomatic });
+  const statusText = playback.status === "blocked"
+    ? "O navegador não iniciou o vídeo. Toque em reproduzir para assistir."
+    : playback.status === "error"
+      ? "Não foi possível carregar o player. Tente novamente ou assista pelo YouTube."
+      : playback.status === "loading"
+        ? "Carregando vídeo…"
+        : playback.status === "playing"
+          ? playback.muted ? "Reproduzindo sem som." : "Reproduzindo com som."
+          : playback.status === "paused" ? "Vídeo pausado." : playback.status === "ended" ? "Vídeo encerrado." : "O vídeo inicia sem som ao aparecer na tela.";
+  return (
+    <>
+      <div className="channel-youtube-host" ref={playback.host} />
+      {(playback.status === "idle" || playback.status === "error") && (
+        <button type="button" className="channel-play" aria-label={`Reproduzir ${video.title}`} onClick={playback.start}>
+          <Thumbnail key={video.videoId} video={video} />
+          <span className="channel-feature-tag"><Youtube size={16} aria-hidden="true" /> NO CANAL DA KATIELLE</span>
+          <span className="channel-play-icon"><Play size={32} fill="currentColor" aria-hidden="true" /></span>
+          <span className="channel-play-label">{playback.status === "error" ? "Tentar novamente" : "Dê o play. Venha conhecer."}</span>
+        </button>
+      )}
+      {controlsTarget && createPortal(<div className="channel-playback-controls">
+        <p role="status">{statusText}</p>
+        {playback.status !== "idle" && <div>
+          <button type="button" onClick={playback.status === "playing" ? playback.pause : playback.start} disabled={playback.status === "loading"}>
+            {playback.status === "playing" ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+            {playback.status === "playing" ? "Pausar vídeo" : playback.status === "error" ? "Tentar reproduzir vídeo" : "Reproduzir vídeo"}
+          </button>
+          <button type="button" disabled={!playback.ready} onClick={playback.toggleSound}>
+            {playback.muted ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}
+            {playback.muted ? "Ativar som do vídeo" : "Silenciar vídeo"}
+          </button>
+        </div>}
+      </div>, controlsTarget)}
+    </>
+  );
+}
+
 export function StudioVideo() {
   const { videos, loading } = useStudioVideos();
   const { compact } = usePresentation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [controlsHost, setControlsHost] = useState<HTMLDivElement | null>(null);
   const player = useRef<HTMLDivElement>(null);
   const selected = videos.find(v => v.videoId === selectedId) || videos[0];
   const suggestions = videos.filter(v => v.videoId !== selected?.videoId);
@@ -40,25 +88,13 @@ export function StudioVideo() {
         <div className="channel-layout" aria-busy={loading}>
           <div className="channel-feature">
             <div className="channel-player" ref={player} tabIndex={-1} role="group" aria-label="Vídeo em destaque">
-              {selected ? playingId === selected.videoId ? (
-                <iframe key={selected.videoId} title={`YouTube: ${selected.title}`}
-                  src={`https://www.youtube-nocookie.com/embed/${selected.videoId}?autoplay=1&rel=0&playsinline=1`}
-                  allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin" />
-              ) : (
-                <button type="button" className="channel-play" aria-label={`Reproduzir ${selected.title}`}
-                  onClick={() => setPlayingId(selected.videoId)}>
-                  <Thumbnail key={selected.videoId} video={selected} />
-                  <span className="channel-feature-tag"><Youtube size={16} aria-hidden="true" /> NO CANAL DA KATIELLE</span>
-                  <span className="channel-play-icon"><Play size={32} fill="currentColor" aria-hidden="true" /></span>
-                  <span className="channel-play-label">Dê o play. Venha conhecer.</span>
-                </button>
-              ) : (
+              {selected ? <ChannelPlayer key={selected.videoId} video={selected} target={player} manualStart={selectedId === selected.videoId} allowAutomatic={!loading} controlsTarget={controlsHost} /> : (
                 <div className="channel-no-video"><Youtube size={44} aria-hidden="true" /><p>Novas histórias de cuidado vêm por aí.</p><a href={channelUrl} target="_blank" rel="noopener noreferrer">Conhecer o canal <ArrowUpRight size={17} /></a></div>
               )}
             </div>
+            {selected && <div className="channel-playback-slot" ref={setControlsHost} />}
             <div className="channel-feature-caption">
-              <span className="channel-kicker">{playingId === selected?.videoId ? "AGORA NO PLAYER" : "EM DESTAQUE"}</span>
+              <span className="channel-kicker">EM DESTAQUE</span>
               <h3>{selected?.title || "Nosso próximo encontro é no YouTube."}</h3>
               <a href={watchUrl} target="_blank" rel="noopener noreferrer">{selected ? "Assistir no YouTube" : "Visitar o canal"} <ArrowUpRight size={16} aria-hidden="true" /></a>
             </div>
@@ -71,7 +107,7 @@ export function StudioVideo() {
                 return <li key={video?.videoId || `empty-${index}`}>
                   {video ? (
                     <button className="channel-suggestion" type="button" aria-label={`Assistir ${video.title}`}
-                      onClick={() => { setSelectedId(video.videoId); setPlayingId(video.videoId); player.current?.focus(); }}>
+                      onClick={() => { setSelectedId(video.videoId); player.current?.focus(); }}>
                       <span className="channel-miniature"><Thumbnail key={video.videoId} video={video} /><span className="channel-mini-play"><Play size={17} fill="currentColor" aria-hidden="true" /></span></span>
                       <span className="channel-suggestion-copy"><small>NO CANAL</small><strong>{video.title}</strong><span>Assistir agora <ArrowUpRight size={14} aria-hidden="true" /></span></span>
                     </button>
@@ -87,7 +123,7 @@ export function StudioVideo() {
             <p className="channel-more-note">Treine com atenção.<br /><span>Leve esse cuidado com você.</span></p>
           </aside>
         </div>
-        {selected && <p className="channel-player-note">{compact ? "Prefere o aplicativo? " : "O vídeo carrega ao dar play. Prefere abrir no aplicativo? "}<a href={watchUrl} target="_blank" rel="noopener noreferrer">Assista pelo YouTube <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
+        {selected && <p className="channel-player-note">{compact ? "O vídeo inicia sem som ao entrar na tela. " : "A reprodução automática inicia sem som quando o vídeo aparece na tela e pode ser bloqueada pelo navegador. "}<a href={watchUrl} target="_blank" rel="noopener noreferrer">Assista pelo YouTube <ArrowUpRight size={14} aria-hidden="true" /></a></p>}
         <span className="sr-only" role="status">{selected ? `Vídeo selecionado: ${selected.title}` : "Nenhum vídeo selecionado."}</span>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { mockYoutube } from "./youtube-fixture";
 const api = "http://127.0.0.1:59999/rest/v1/rpc/get_public_studio_plans";
 const rates = [245, 315, 395, 470, 600].map((monthlyPrice, index) => ({
   days: index + 2,
@@ -16,6 +17,7 @@ const respond = (route: Route, data: unknown, status = 200) =>
     ? route.fulfill({ status: 204, headers: cors })
     : route.fulfill({ status, json: data, headers: cors });
 test.beforeEach(async ({ page }) => {
+  await mockYoutube(page);
   await page.route(api, (route) => respond(route, rates));
   await page.route("**/rest/v1/rpc/get_public_studio_videos", (route) => respond(route, {
     version: 0, videos: [{ videoId: "ZsS8bJw2i9k", title: "Um pouco do Studio Katielle Faleiros" }],

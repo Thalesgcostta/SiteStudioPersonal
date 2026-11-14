@@ -235,7 +235,7 @@ function Method() {
         </p>
       </div>
       <div className="method-layout">
-        <div className="method-photo">
+        <div className="method-photo" id="method-photo">
           {features.map((item, index) => (
             <div
               className={`method-photo-layer ${selected === index ? "is-active" : ""}`}
@@ -265,6 +265,7 @@ function Method() {
                 className="method-feature"
                 key={item.number}
                 aria-pressed={selected === index}
+                aria-controls="method-photo"
                 onMouseEnter={() => setSelected(index)}
                 onFocus={() => setSelected(index)}
                 onClick={() => setSelected(index)}
@@ -275,7 +276,7 @@ function Method() {
                     <item.icon size={23} aria-hidden="true" />
                     <span>{item.title}</span>
                   </span>
-                  <span className="feature-description">{compact ? item.shortText : item.text}</span>
+                  {!compact && <span className="feature-description">{item.text}</span>}
                 </span>
                 <ArrowUpRight
                   className="feature-arrow"
@@ -285,6 +286,7 @@ function Method() {
               </button>
             ))}
           </div>
+          {compact && <p className="method-selected-description" role="status">{features[selected].shortText}</p>}
           {compact && (
             <details className="compact-details method-details">
               <summary>Mais sobre nosso cuidado <ChevronDown size={18} aria-hidden="true" /></summary>
@@ -571,8 +573,7 @@ export default function App() {
   return (
     <>
       <Header />
-      <PresentationSwitch />
-      <main id="conteudo" tabIndex={-1}>
+      <main id="conteudo" tabIndex={-1} aria-label="Conteúdo do Studio Katielle Faleiros">
         <Hero />
         <About />
         <Method />
@@ -598,7 +599,7 @@ export default function App() {
           <span>Franca, SP · Movimento com atenção.</span>
           <p>© {new Date().getFullYear()} Studio Katielle Faleiros</p>
         </div>
-        <PresentationSwitch placement="footer" />
+        <PresentationSwitch />
       </footer>
       <aside className="floating-contact" aria-label="Contato rápido">
         <a

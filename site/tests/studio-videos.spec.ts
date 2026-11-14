@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { mockYoutube } from "./youtube-fixture";
 
 const rpc = "**/rest/v1/rpc/get_public_studio_videos";
 const video = { videoId: "ZsS8bJw2i9k", title: "Um pouco do Studio Katielle Faleiros" };
@@ -17,12 +18,10 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://i.ytimg.com/**", route => route.fulfill({
     contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="#172c37"/></svg>',
   }));
-  await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({
-    contentType: "text/html", body: "<!doctype html><title>Player simulado</title><p>Player externo simulado para teste local.</p>",
-  }));
+  await mockYoutube(page);
 });
 
-test("vídeo indicado em destaque, três espaços vazios e player só após clique", async ({ page }) => {
+test("vídeo só tenta autoplay ao aparecer, sem som, com três espaços vazios e consulta pública isolada", async ({ page }) => {
   const embeds: string[] = [];
   const privateCalls: string[] = [];
   page.on("request", r => {
@@ -32,18 +31,22 @@ test("vídeo indicado em destaque, três espaços vazios e player só após cliq
   await page.addInitScript(() => localStorage.setItem("sb-127-auth-token", JSON.stringify({ access_token: "never-send-this-session" })));
   await page.goto("/");
   const section = page.locator("#em-movimento");
-  await section.scrollIntoViewIfNeeded();
   await expect(section.locator(".channel-layout")).toHaveAttribute("aria-busy", "false");
-  await expect(section.locator(".channel-empty")).toHaveCount(3);
-  await expect(section.locator(".channel-suggestion")).toHaveCount(0);
   await expect(section.locator("iframe")).toHaveCount(0);
   expect(embeds).toEqual([]);
+  await expect(section.locator(".channel-empty")).toHaveCount(3);
+  await expect(section.locator(".channel-suggestion")).toHaveCount(0);
   await expect(section.getByRole("link", { name: "Explorar o canal" })).toHaveAttribute("href", "https://www.youtube.com/@KatielleFaleiros.");
   await expect(section.getByRole("link", { name: "Assistir no YouTube", exact: true })).toHaveAttribute("href", `https://www.youtube.com/watch?v=${video.videoId}`);
   await expect(section.locator(".channel-player")).toHaveCSS("border-top-color", "rgb(255, 104, 0)");
   await expect(section.locator(".channel-miniature").first()).toHaveCSS("border-top-style", "dashed");
-  await section.getByRole("button", { name: `Reproduzir ${video.title}` }).click();
-  await expect(section.locator("iframe")).toHaveAttribute("src", `https://www.youtube-nocookie.com/embed/${video.videoId}?autoplay=1&rel=0&playsinline=1`);
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
+  await expect(section.locator("iframe")).toHaveAttribute("src", /embed\/ZsS8bJw2i9k\?/);
+  await expect(section.getByRole("button", { name: "Pausar vídeo", exact: true })).toBeVisible();
+  const commands = await page.evaluate(() => (window as any).__youtubeMock.operations);
+  expect(commands.filter((command: any) => command.command === "playVideo")).toEqual([{ command: "playVideo", videoId: video.videoId, muted: true }]);
+  await section.getByRole("button", { name: "Ativar som do vídeo", exact: true }).click();
+  await expect(section.getByRole("button", { name: "Silenciar vídeo", exact: true })).toBeVisible();
   expect(embeds).toHaveLength(1);
   expect(privateCalls).toEqual([]);
 });
@@ -92,14 +95,101 @@ test("resposta pública malformada não injeta links ou conteúdo no player", as
   await expect(section.locator(".channel-empty")).toHaveCount(3);
 });
 
-test("miniatura indisponível mantém título, botão e fallback visual", async ({ page }) => {
+test("miniatura indisponível mantém título e botão manual antes de iniciar o player", async ({ page }) => {
   await page.route("https://i.ytimg.com/**", route => route.abort());
+  // API failure leaves the accessible manual retry and external link available.
+  await page.route("https://www.youtube.com/iframe_api", route => route.abort());
   await page.goto("/");
   const section = page.locator("#em-movimento");
-  await section.scrollIntoViewIfNeeded();
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
   await expect(section.locator(".channel-image-fallback")).toHaveText("KF");
-  await expect(section.getByRole("button", { name: `Reproduzir ${video.title}` })).toBeVisible();
+  await expect(section.getByRole("button", { name: `Reproduzir ${video.title}`, exact: true })).toBeVisible();
+  await expect(section.getByRole("status").filter({ hasText: "Não foi possível carregar" })).toBeVisible();
+  await expect(section.getByRole("link", { name: "Assistir no YouTube", exact: true })).toHaveAttribute("href", `https://www.youtube.com/watch?v=${video.videoId}`);
 });
+
+test("bloqueio de autoplay oferece play manual e não confunde iframe carregado com reprodução", async ({ page }) => {
+  await mockYoutube(page, { blockAutomatic: true });
+  await page.goto("/");
+  const section = page.locator("#em-movimento");
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
+  await expect(section.getByRole("status").filter({ hasText: "O navegador não iniciou" })).toBeVisible();
+  await expect(section.getByRole("button", { name: "Reproduzir vídeo", exact: true })).toBeEnabled();
+  await section.getByRole("button", { name: "Reproduzir vídeo", exact: true }).click();
+  await expect(section.getByRole("status").filter({ hasText: "Reproduzindo com som" })).toBeVisible();
+});
+
+test("pausa manual e saída da tela não reiniciam vídeo automaticamente ao retornar", async ({ page }) => {
+  await page.goto("/");
+  const section = page.locator("#em-movimento");
+  const frame = section.locator(".channel-player");
+  await frame.scrollIntoViewIfNeeded();
+  await section.getByRole("button", { name: "Pausar vídeo", exact: true }).click();
+  await page.locator("#inicio").scrollIntoViewIfNeeded();
+  await frame.scrollIntoViewIfNeeded();
+  await expect(section.getByRole("status").filter({ hasText: "Vídeo pausado" })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__youtubeMock.operations.filter((command: any) => command.command === "playVideo").length)).toBe(1);
+  await section.getByRole("button", { name: "Reproduzir vídeo", exact: true }).click();
+  await expect(section.getByRole("button", { name: "Pausar vídeo", exact: true })).toBeVisible();
+  await page.locator("#inicio").scrollIntoViewIfNeeded();
+  await frame.scrollIntoViewIfNeeded();
+  await expect(section.getByRole("status").filter({ hasText: "Vídeo pausado" })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__youtubeMock.operations.filter((command: any) => command.command === "playVideo").length)).toBe(2);
+});
+
+test("consulta ainda carregando ou seleção vazia não toca vídeo inicial por engano", async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route(rpc, async route => {
+    if (route.request().method() === "OPTIONS") return respond(route, { version: 2, videos: [] });
+    await pending;
+    return respond(route, { version: 2, videos: [] });
+  });
+  await page.goto("/");
+  const section = page.locator("#em-movimento");
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
+  await expect(section.locator(".channel-layout")).toHaveAttribute("aria-busy", "true");
+  await expect(section.locator("iframe")).toHaveCount(0);
+  release();
+  await expect(section.locator(".channel-no-video")).toBeVisible();
+  await expect(section.locator("iframe")).toHaveCount(0);
+});
+
+test("aba oculta pausa a reprodução e voltar à aba não ignora a pausa", async ({ page }) => {
+  await page.goto("/");
+  const section = page.locator("#em-movimento");
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
+  await expect(section.getByRole("button", { name: "Pausar vídeo", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(section.getByRole("status").filter({ hasText: "Vídeo pausado" })).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(section.getByRole("button", { name: "Reproduzir vídeo", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).__youtubeMock.operations.filter((command: any) => command.command === "playVideo").length)).toBe(1);
+});
+
+test("API que termina de carregar depois de sair da seção não reproduz fora da tela", async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route("https://www.youtube.com/iframe_api", async route => { await pending; await route.fallback(); });
+  await page.goto("/");
+  const section = page.locator("#em-movimento");
+  const requested = page.waitForRequest("https://www.youtube.com/iframe_api");
+  await section.locator(".channel-player").scrollIntoViewIfNeeded();
+  await requested;
+  await page.locator("#inicio").scrollIntoViewIfNeeded();
+  // Wait for the browser's observer to report that the player is outside the viewport.
+  await expect.poll(() => section.locator(".channel-player").evaluate(el => el.getBoundingClientRect().top)).toBeGreaterThan(1000);
+  release();
+  await expect(section.locator("iframe")).toHaveCount(1);
+  expect(await page.evaluate(() => (window as any).__youtubeMock.operations.filter((command: any) => command.command === "playVideo").length)).toBe(0);
+});
+
 
 for (const width of [390, 768, 1440]) {
   test(`seção de vídeos cabe em ${width}px e tem controles acessíveis`, async ({ page }) => {
